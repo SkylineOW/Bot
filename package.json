@@ -1,0 +1,75 @@
+{
+  "name": "Skybot",
+  "version": "1.0.0",
+  "description": "",
+  "author": "oOCKYOo",
+  "license": "MIT",
+  "scripts": {
+    "build": "babel -d ./build ./src",
+    "postinstall": "babel -d ./build ./src",
+    "start": "babel-node src/server",
+    "start:prod": "node build/server",
+    "start:worker": "babel-node src/worker"
+
+  },
+  "babel": {
+    "presets": [
+      [
+        "latest",
+        {
+          "es2015": {
+            "modules": false
+          }
+        }
+      ],
+      "react",
+      "stage-0"
+    ],
+    "env": {
+      "production": {
+        "only": [
+          "src"
+        ],
+        "plugins": [
+          "transform-react-remove-prop-types",
+          "transform-react-constant-elements",
+          "transform-react-inline-elements"
+        ]
+      }
+    }
+  },
+  "dependencies": {
+    "async": "^2.1.4",
+    "axios": "^0.15.3",
+    "babel-polyfill": "^6.20.0",
+    "bluebird": "^3.4.7",
+    "body-parser": "^1.15.2",
+    "cookie-parser": "^1.4.3",
+    "eris": "^0.5.1",
+    "express": "^4.14.0",
+    "moment": "^2.17.1",
+    "mongoose": "^4.7.6",
+    "react": "^15.4.1",
+    "react-dom": "^15.4.1",
+    "redis": "^2.6.3",
+    "redis-setinterval": "^1.0.1",
+    "twitter": "^1.7.0"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.18.0",
+    "babel-core": "^6.21.0",
+    "babel-eslint": "^7.1.1",
+    "babel-loader": "^6.2.10",
+    "babel-plugin-react-intl": "2.2.0",
+    "babel-plugin-react-transform": "2.0.2",
+    "babel-plugin-transform-react-constant-elements": "6.9.1",
+    "babel-plugin-transform-react-inline-elements": "6.8.0",
+    "babel-plugin-transform-react-remove-prop-types": "0.2.9",
+    "babel-plugin-transform-runtime": "6.15.0",
+    "babel-preset-latest": "6.14.0",
+    "babel-preset-react": "6.11.1",
+    "babel-preset-react-hmre": "1.1.1",
+    "babel-preset-stage-0": "6.5.0",
+    "webpack": "1.13.3"
+  }
+}
