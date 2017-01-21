@@ -72,6 +72,6 @@ app.use((err, req, res) => {
   res.send({ error: err.message });
 });
 
-app.listen(3001, () => {
+app.listen(config.port, () => {
   console.log('The server is running at http://localhost:3001/');
 });

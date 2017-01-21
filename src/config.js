@@ -1,4 +1,5 @@
 module.exports = {
+  port: process.env.PORT || 3001,
   prefix: process.env.BOT_PREFIX || '!',
 
   discord: {
