@@ -46,11 +46,11 @@ module.exports = {
 
       const startRaffle = async() => {
         // Fetch the guild
-        let guild = await Guild.findById(msg.guild.id);
+        let guild = await Guild.findById(msg.channel.guild.id);
 
         if (!guild) {
           // No guild, create a default one.
-          guild = await Guild.create({_id: msg.guild.id});
+          guild = await Guild.create({_id: msg.channel.guild.id});
         }
 
         // If there are no raffle settings for this guild, create default based on message.
@@ -61,7 +61,7 @@ module.exports = {
             guild: guild,
           });
 
-          guild = await Guild.findByIdAndUpdate(msg.guild.id, {raffle: raffle}, {new: true, safe: true});
+          guild = await Guild.findByIdAndUpdate(msg.channel.guild.id, {raffle: raffle}, {new: true, safe: true});
         }
 
         guild = await new Promise((resolve) => {
@@ -101,20 +101,20 @@ module.exports = {
 
         if(duration) {
           await Redis.multi()
-            .set(`Raffle:${msg.guild.id}:status`, status.inProgress)
-            .set(`Raffle:${msg.guild.id}:timeout`, 'Close')
-            .expire(`Raffle:${msg.guild.id}:timeout`, duration * 60)
+            .set(`Raffle:${msg.channel.guild.id}:status`, status.inProgress)
+            .set(`Raffle:${msg.channel.guild.id}:timeout`, 'Close')
+            .expire(`Raffle:${msg.channel.guild.id}:timeout`, duration * 60)
             .execAsync();
 
           // ToDo: Start an interval monitoring the timeout and perform action when done.
         } else {
-          await Redis.setAsync(`Raffle:${msg.guild.id}:status`, status.inProgress);
+          await Redis.setAsync(`Raffle:${msg.channel.guild.id}:status`, status.inProgress);
         }
 
         return 'The raffle has started.';
       };
 
-      let raffle = await Redis.getAsync(`Raffle:${msg.guild.id}:status`);
+      let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
 
       if (!raffle) {
         // No state, create one.

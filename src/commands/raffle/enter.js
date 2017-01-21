@@ -35,12 +35,12 @@ module.exports = {
 
       const joinRaffle = async() => {
         // Check if the user is on the list
-        const entries = await Redis.smembersAsync(`Raffle:${msg.guild.id}:entries`);
+        const entries = await Redis.smembersAsync(`Raffle:${msg.channel.guild.id}:entries`);
 
         if(!entries || (entries && entries.indexOf(msg.author.id) === -1)) {
           //List does not exist, create it with the user's id.
 
-          const result = await Redis.saddAsync([`Raffle:${msg.guild.id}:entries`, msg.author.id]);
+          const result = await Redis.saddAsync([`Raffle:${msg.channel.guild.id}:entries`, msg.author.id]);
 
           return `${msg.author.mention} has entered.`;
         }
@@ -49,7 +49,7 @@ module.exports = {
       };
 
       //Get the raffle status from redis for this guild.
-      let raffle = await Redis.getAsync(`Raffle:${msg.guild.id}:status`);
+      let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
 
       switch (raffle) {
         case status.inProgress:

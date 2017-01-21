@@ -36,18 +36,18 @@ module.exports = {
 
       const addManager = async() => {
         // Fetch the guild
-        let guild = await Guild.findById(msg.guild.id);
+        let guild = await Guild.findById(msg.channel.guild.id);
 
         if (!guild) {
           // No guild, create a default one.
-          guild = await Guild.create({_id: msg.guild.id});
+          guild = await Guild.create({_id: msg.channel.guild.id});
         }
 
         // If there are no raffle settings for the guild, create defaults based on message.
         if (!guild.raffle) {
           const raffle = await Raffle.create({managers: [msg.author.id], guild: guild});
 
-          guild = await Guild.findByIdAndUpdate(msg.guild.id, {raffle: raffle}, {new: true, safe: true});
+          guild = await Guild.findByIdAndUpdate(msg.channel.guild.id, {raffle: raffle}, {new: true, safe: true});
         } else {
 
           guild = await new Promise((resolve) => {

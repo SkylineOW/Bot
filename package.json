@@ -10,7 +10,6 @@
     "start": "babel-node src/server",
     "start:prod": "node build/server",
     "start:worker": "babel-node src/worker"
-
   },
   "babel": {
     "presets": [

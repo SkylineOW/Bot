@@ -37,7 +37,7 @@ module.exports = {
 
       const removeChannel = async() => {
         // Fetch the guild
-        let guild = await Guild.findById(msg.guild.id);
+        let guild = await Guild.findById(msg.channel.guild.id);
 
         if (!guild || !guild.raffle) {
           // No guild, exit out.

@@ -39,11 +39,11 @@ module.exports = {
         return `Invalid usage. Do \`!help raffle close\` to view proper usage.`;
       }
 
-      let raffle = await Redis.getAsync(`Raffle:${msg.guild.id}:status`);
+      let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
 
       const closeRaffle = async() => {
         // Fetch the guild
-        let guild = await Guild.findById(msg.guild.id);
+        let guild = await Guild.findById(msg.channel.guild.id);
 
         // This guild should exist and have settings since raffles cant start without a guild or settings.
         if (!guild || !guild.raffle) {
@@ -83,8 +83,8 @@ module.exports = {
         });
 
         await Redis.multi()
-          .set(`Raffle:${msg.guild.id}:status`, status.closed)
-          .del(`Raffle:${msg.guild.id}:timeout`)
+          .set(`Raffle:${msg.channel.guild.id}:status`, status.closed)
+          .del(`Raffle:${msg.channel.guild.id}:timeout`)
           .execAsync();
 
         return 'The raffle is now closed.';

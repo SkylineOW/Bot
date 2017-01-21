@@ -45,7 +45,7 @@ module.exports = {
 
       const openRaffle = async() => {
         // Fetch the guild
-        let guild = await Guild.findById(msg.guild.id);
+        let guild = await Guild.findById(msg.channel.guild.id);
 
         // This guild should exist and have settings since raffles cant start without a guild or settings.
         if(!guild || !guild.raffle) {
@@ -87,20 +87,20 @@ module.exports = {
         if(duration)
         {
           await Redis.multi()
-            .set(`Raffle:${msg.guild.id}:status`, status.inProgress)
-            .set(`Raffle:${msg.guild.id}:timeout`, 'Close')
-            .expire(`Raffle:${msg.guild.id}:timeout`, duration * 60)
+            .set(`Raffle:${msg.channel.guild.id}:status`, status.inProgress)
+            .set(`Raffle:${msg.channel.guild.id}:timeout`, 'Close')
+            .expire(`Raffle:${msg.channel.guild.id}:timeout`, duration * 60)
             .execAsync();
 
           // ToDo: Start an interval monitoring the timeout and perform action when done.
         } else {
-          await Redis.setAsync(`Raffle:${msg.guild.id}:status`, status.inProgress);
+          await Redis.setAsync(`Raffle:${msg.channel.guild.id}:status`, status.inProgress);
         }
 
         return 'The raffle has reopened.';
       };
 
-      let raffle = await Redis.getAsync(`Raffle:${msg.guild.id}:status`);
+      let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
 
       switch (raffle) {
         case status.closed:

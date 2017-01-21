@@ -38,7 +38,7 @@ module.exports = {
 
       const finishRaffle = async() => {
         // Fetch the guild
-        let guild = await Guild.findById(msg.guild.id);
+        let guild = await Guild.findById(msg.channel.guild.id);
 
         // This guild should exist and have settings since raffles cant start without a guild or settings.
         if(!guild || !guild.raffle) {
@@ -77,15 +77,15 @@ module.exports = {
         });
 
         await Redis.multi()
-          .del(`Raffle:${msg.guild.id}:status`)
-          .del(`Raffle:${msg.guild.id}:entries`)
-          .del(`Raffle:${msg.guild.id}:timeout`)
+          .del(`Raffle:${msg.channel.guild.id}:status`)
+          .del(`Raffle:${msg.channel.guild.id}:entries`)
+          .del(`Raffle:${msg.channel.guild.id}:timeout`)
           .execAsync();
 
         return 'The raffle has finished.';
       };
 
-      let raffle = await Redis.getAsync(`Raffle:${msg.guild.id}:status`);
+      let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
 
       switch (raffle) {
         case status.inProgress:

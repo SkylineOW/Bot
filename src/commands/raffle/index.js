@@ -116,9 +116,9 @@ module.exports = {
       }
 
       let raffle = await Redis.multi()
-        .get(`Raffle:${msg.guild.id}:status`)
-        .scard(`Raffle:${msg.guild.id}:entries`)
-        .ttl(`Raffle:${msg.guild.id}:timeout`)
+        .get(`Raffle:${msg.channel.guild.id}:status`)
+        .scard(`Raffle:${msg.channel.guild.id}:entries`)
+        .ttl(`Raffle:${msg.channel.guild.id}:timeout`)
         .execAsync();
 
       //Helper function for controlling output message
