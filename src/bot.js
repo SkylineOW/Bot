@@ -28,6 +28,7 @@ const Task = require('data/mongoose').models.Task;
 
 const bot = new Eris.CommandClient(config.discord.token, {}, {
   description: 'A helpful omnic to help lighten the load of mods.',
+  author: 'Ocky',
   prefix: config.prefix,
 });
 
