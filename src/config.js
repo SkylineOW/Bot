@@ -18,11 +18,11 @@ module.exports = {
   },
 
   mongoose: {
-    database_url: process.env.MONGODB_URI || 'mongodb://localhost/skybot',
+    database_url: process.env.MONGODB_URI || 'mongodb://localhost/zenbot',
   },
 
   redis: {
-    url: process.env.REDISCLOUD_URL || 'redis://10.0.0.6:6379' //redis://rediscloud:o7DYQyT91Ep6YnQz@redis-18541.c3.eu-west-1-2.ec2.cloud.redislabs.com:18541'
+    url: process.env.REDISCLOUD_URL || 'redis://10.0.0.6:6379'
   }
 
 };
