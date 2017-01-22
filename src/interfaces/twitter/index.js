@@ -8,7 +8,7 @@ const Twitter = require('twitter');
 const config = require('../../config');
 
 /**
- * The main interface object with the twitter api. Primarily for one off implementations.
+ * The main interface object with the twitter api.
  * @type {Twitter}
  */
 const client = new Twitter({

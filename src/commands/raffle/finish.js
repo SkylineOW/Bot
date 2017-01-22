@@ -7,7 +7,7 @@ const async = require('async');
 const Guild = require('data/mongoose').models.Guild;
 const Redis = require('data/redis');
 
-const status = require('./status');
+const status = require('./../../utils/status');
 
 const label = 'finish';
 const options = {
@@ -32,68 +32,65 @@ const options = {
 };
 
 module.exports = {
-  RegisterCommand: (bot, parent) => {
-    const command = parent.registerSubcommand(label, async(msg, args) => {
-      // Input validation
+  exec: async(msg, args) => {
+    // Input validation
 
-      const finishRaffle = async() => {
-        // Fetch the guild
-        let guild = await Guild.findById(msg.channel.guild.id);
+    const finishRaffle = async() => {
+      // Fetch the guild
+      let guild = await Guild.findById(msg.channel.guild.id);
 
-        // This guild should exist and have settings since raffles cant start without a guild or settings.
-        if(!guild || !guild.raffle) {
-          //ToDo: Report this to the bot alert webhook for inspection.
-          return 'Something went wrong, please try again.';
+      // This guild should exist and have settings since raffles cant start without a guild or settings.
+      if (!guild || !guild.raffle) {
+        //ToDo: Report this to the bot alert webhook for inspection.
+        return 'Something went wrong, please try again.';
+      }
+
+      guild = await new Promise((resolve) => {
+        guild.populate('raffle', (error, result) => {
+          resolve(result);
+        });
+      });
+
+      //Broadcast on all channels listed that the raffle is closed.
+      await async.each(guild.raffle.channels, async(channelId, callback) => {
+        //Skip the channel this was written.
+        if (channelId === msg.channel.id) {
+          return callback();
         }
 
-        guild = await new Promise((resolve) => {
-          guild.populate('raffle', (error, result) => {
-            resolve(result);
-          });
-        });
+        console.log(channelId);
+        callback();
+      });
 
-        //Broadcast on all channels listed that the raffle is closed.
-        await async.each(guild.raffle.channels, async (channelId, callback) => {
-          //Skip the channel this was written.
-          if(channelId === msg.channel.id)
-          {
-            return callback();
-          }
+      //Inform all managers about the raffle state.
+      await async.each(guild.raffle.managers, async(userId, callback) => {
+        //Skip the user that sent this message.
+        if (userId === msg.author.id) {
+          return callback();
+        }
 
-          console.log(channelId);
-          callback();
-        });
+        console.log(userId);
+        callback();
+      });
 
-        //Inform all managers about the raffle state.
-        await async.each(guild.raffle.managers, async (userId, callback) => {
-          //Skip the user that sent this message.
-          if(userId === msg.author.id)
-          {
-            return callback();
-          }
+      await Redis.multi()
+        .del(`Raffle:${msg.channel.guild.id}:status`)
+        .del(`Raffle:${msg.channel.guild.id}:entries`)
+        .del(`Raffle:${msg.channel.guild.id}:timeout`)
+        .execAsync();
 
-          console.log(userId);
-          callback();
-        });
+      return 'The raffle has finished.';
+    };
 
-        await Redis.multi()
-          .del(`Raffle:${msg.channel.guild.id}:status`)
-          .del(`Raffle:${msg.channel.guild.id}:entries`)
-          .del(`Raffle:${msg.channel.guild.id}:timeout`)
-          .execAsync();
+    let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
 
-        return 'The raffle has finished.';
-      };
-
-      let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
-
-      switch (raffle) {
-        case status.inProgress:
-        case status.closed:
-          return await finishRaffle();
-        default:
-          return `The raffle is already finished.`;
-      }
-    }, options);
-  }
+    switch (raffle) {
+      case status.inProgress:
+      case status.closed:
+        return await finishRaffle();
+      default:
+        return `The raffle is already finished.`;
+    }
+  },
+  options: options
 };

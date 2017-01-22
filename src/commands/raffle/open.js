@@ -11,9 +11,8 @@ const async = require('async');
 const Guild = require('data/mongoose').models.Guild;
 const Redis = require('data/redis');
 
-const status = require('./status');
+const status = require('./../../utils/status');
 
-const label = 'open';
 const options = {
   aliases: [],
   caseInsensitive: false,
@@ -36,8 +35,7 @@ const options = {
 };
 
 module.exports = {
-  RegisterCommand: (bot, parent) => {
-    const command = parent.registerSubcommand(label, async(msg, args) => {
+  exec: async(msg, args) => {
       // Input validation
       // ToDo: Handle input validation to make sure the minutes value is right.
 
@@ -112,8 +110,6 @@ module.exports = {
         default:
           return 'Only closed raffles can be opened.';
       }
-    }, options);
-
-    //Register subcommands
-  }
+    },
+  options: options
 };

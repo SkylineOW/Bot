@@ -5,7 +5,6 @@
 const Guild = require('data/mongoose').models.Guild;
 const Raffle = require('data/mongoose').models.Raffle;
 
-const label = 'add';
 const options = {
   aliases: [],
   caseInsensitive: false,
@@ -28,8 +27,7 @@ const options = {
 };
 
 module.exports = {
-  RegisterCommand: (bot, parent) => {
-    const command = parent.registerSubcommand(label, async(msg, args) => {
+  exec: async(msg, args) => {
       //Input validation
       if (args.length > 0) {
         return `Invalid usage. Do \`!help raffle add\` to view proper usage.`;
@@ -70,8 +68,6 @@ module.exports = {
 
       // Channels can be added regardless of the raffle state.
       return await addChannel();
-    }, options);
-
-    // Register subcommands
-  }
+    },
+  options: options
 };

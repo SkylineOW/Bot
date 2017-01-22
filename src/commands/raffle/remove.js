@@ -28,46 +28,43 @@ const options = {
 };
 
 module.exports = {
-  RegisterCommand: (bot, parent) => {
-    const command = parent.registerSubcommand(label, async(msg, args) => {
-      // Input validation
-      if (args.length > 0) {
-        return `Invalid usage. Do \`!help raffle remove\` to view proper usage.`;
+  exec: async(msg, args) => {
+    // Input validation
+    if (args.length > 0) {
+      return `Invalid usage. Do \`!help raffle remove\` to view proper usage.`;
+    }
+
+    const removeChannel = async() => {
+      // Fetch the guild
+      let guild = await Guild.findById(msg.channel.guild.id);
+
+      if (!guild || !guild.raffle) {
+        // No guild, exit out.
+        return `The raffle does not use this channel.`;
       }
 
-      const removeChannel = async() => {
-        // Fetch the guild
-        let guild = await Guild.findById(msg.channel.guild.id);
-
-        if (!guild || !guild.raffle) {
-          // No guild, exit out.
-          return `The raffle does not use this channel.`;
-        }
-
-        guild = await new Promise((resolve) => {
-          guild.populate('raffle', (error, result) => {
-            resolve(result);
-          });
+      guild = await new Promise((resolve) => {
+        guild.populate('raffle', (error, result) => {
+          resolve(result);
         });
+      });
 
-        if(guild.raffle.channels.indexOf(msg.channel.id) === -1) {
-          return `The raffle does not use this channel.`;
-        }
+      if (guild.raffle.channels.indexOf(msg.channel.id) === -1) {
+        return `The raffle does not use this channel.`;
+      }
 
-        // Raffle needs at least 1 channel to post results in.
-        if (guild.raffle.channels.length <= 1) {
-          return 'The raffle needs at least one channel to post results in.\nPlease add another channel before removing this one.';
-        }
+      // Raffle needs at least 1 channel to post results in.
+      if (guild.raffle.channels.length <= 1) {
+        return 'The raffle needs at least one channel to post results in.\nPlease add another channel before removing this one.';
+      }
 
-        await Raffle.findByIdAndUpdate(guild.raffle._id, {$pull: {channels: msg.channel.id}}, {new: true, safe: true});
-        return `The raffle no longer uses this channel.`;
-      };
+      await Raffle.findByIdAndUpdate(guild.raffle._id, {$pull: {channels: msg.channel.id}}, {new: true, safe: true});
+      return `The raffle no longer uses this channel.`;
+    };
 
-      // Channels can be removed regardless of the raffle state.
-      return await removeChannel();
+    // Channels can be removed regardless of the raffle state.
+    return await removeChannel();
 
-    }, options);
-
-    // Register subcommands
-  }
+  },
+  options: options,
 };

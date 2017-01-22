@@ -13,39 +13,76 @@
 // https://support.discordapp.com/hc/en-us/articles/210298617-Markdown-Text-101-Chat-Formatting-Bold-Italic-Underline-
 
 const Eris = require('eris');
+const fs = require('fs');
+const path = require('path');
 
+const config = require('./config');
 
-const config = require('config');
-const mongoose = require('data/mongoose');
-
-const twitch = require('interfaces/twitch');
-
-// Database ORM's
-const Guild = require('data/mongoose').models.Guild;
-const Profile = require('data/mongoose').models.Profile;
-const User = require('data/mongoose').models.User;
-const Task = require('data/mongoose').models.Task;
+//Initialize db connection.
+require('data/mongoose');
 
 const bot = new Eris.CommandClient(config.discord.token, {}, {
   description: 'A helpful omnic to help lighten the load of mods.',
-  author: 'Ocky',
+  author: 'Ocky and omni5cience',
   prefix: config.prefix,
 });
-
-const HandleError = (error, response) => {
-  console.log(`Error: ${error}`);
-  response.edit(`Something went wrong, please try again.`);
-};
 
 // Event handling for the bot.
 bot.on('ready', () => {
   console.log(`Ready! Guilds: ${bot.guilds.size}`);
 });
 
-// Register command groups
-require('commands/raffle').RegisterCommand(bot);
+// Helper function for registering commands.
+const registerCommand = async(parent, dir, file, name) => {
+  try {
+    const stat = fs.statSync(path.join(dir, file));
 
-// Connect bot to discord.
-bot.connect();
+    if (stat.isDirectory()) {
+      //Register the index.js in the folder first.
+      const cmd = await registerCommand(parent, path.join(dir, file), 'index.js', file);
+
+      //Remove index from the list
+      let subcmds = fs.readdirSync(path.join(dir, file));
+      subcmds = subcmds.filter((value) => {
+        return value != 'index.js'
+      });
+
+      await Promise.all(subcmds.map((subcmd) => {
+        return new Promise(async(resolve) => {
+          await registerCommand(cmd, path.join(dir, file), subcmd, subcmd.slice(0, -3));
+          resolve();
+        });
+      }));
+
+      return cmd;
+    }
+
+    // Fetch the command data.
+    const data = require(path.join(dir, file));
+
+    if (parent === bot) {
+      return await parent.registerCommand(name, data.exec, data.options);
+    }
+
+    return await parent.registerSubcommand(name, data.exec, data.options);
+  }
+  catch (error) {
+    console.log(`${path.join(dir, file)} could not be loaded:\n${error.stack}`);
+  }
+};
+
+// Auto-load all the commands from commands directory.
+const root = path.resolve(`${__dirname}/commands/`);
+const files = fs.readdirSync(root);
+
+Promise.all(files.map((file) => {
+  return new Promise(async(resolve) => {
+    await registerCommand(bot, root, file, file.slice(0, -3));
+    resolve();
+  });
+})).then(() => {
+  // Connect bot to discord.
+  bot.connect();
+});
 
 module.exports = bot;

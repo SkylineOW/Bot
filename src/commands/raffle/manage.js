@@ -5,7 +5,6 @@
 const Guild = require('data/mongoose').models.Guild;
 const Raffle = require('data/mongoose').models.Raffle;
 
-const label = 'manage';
 const options = {
   aliases: [],
   caseInsensitive: false,
@@ -28,53 +27,49 @@ const options = {
 };
 
 module.exports = {
-  RegisterCommand: (bot, parent) => {
-    const command = parent.registerSubcommand(label, async(msg, args) => {
-      // Input validation
+  exec: async(msg, args) => {
+    // Input validation
+    // ToDo: Implement adding mentioned users and not just the command user.
 
-      // ToDo: Implement adding mentioned users and not just the command user.
+    const addManager = async() => {
+      // Fetch the guild
+      let guild = await Guild.findById(msg.channel.guild.id);
 
-      const addManager = async() => {
-        // Fetch the guild
-        let guild = await Guild.findById(msg.channel.guild.id);
+      if (!guild) {
+        // No guild, create a default one.
+        guild = await Guild.create({_id: msg.channel.guild.id});
+      }
 
-        if (!guild) {
-          // No guild, create a default one.
-          guild = await Guild.create({_id: msg.channel.guild.id});
-        }
+      // If there are no raffle settings for the guild, create defaults based on message.
+      if (!guild.raffle) {
+        const raffle = await Raffle.create({managers: [msg.author.id], guild: guild});
 
-        // If there are no raffle settings for the guild, create defaults based on message.
-        if (!guild.raffle) {
-          const raffle = await Raffle.create({managers: [msg.author.id], guild: guild});
+        guild = await Guild.findByIdAndUpdate(msg.channel.guild.id, {raffle: raffle}, {new: true, safe: true});
+      } else {
 
-          guild = await Guild.findByIdAndUpdate(msg.channel.guild.id, {raffle: raffle}, {new: true, safe: true});
-        } else {
-
-          guild = await new Promise((resolve) => {
-            guild.populate('raffle', (error, result) => {
-              resolve(result);
-            });
+        guild = await new Promise((resolve) => {
+          guild.populate('raffle', (error, result) => {
+            resolve(result);
           });
+        });
 
-          // Check if the user is registered
-          if (guild.raffle.managers.indexOf(msg.author.id) !== -1) {
-            return `${msg.author.mention} is already managing the raffle.`;
-          }
-
-          await Raffle.findByIdAndUpdate(guild.raffle._id, {$push: {managers: msg.author.id}}, {new: true, safe: true});
+        // Check if the user is registered
+        if (guild.raffle.managers.indexOf(msg.author.id) !== -1) {
+          return `${msg.author.mention} is already managing the raffle.`;
         }
 
-        if (guild.raffle.managers.length > 0) {
-          return `${msg.author.mention} now also manages the raffle.`;
-        } else {
-          return `${msg.author.mention} now manages the raffle.`;
-        }
-      };
+        await Raffle.findByIdAndUpdate(guild.raffle._id, {$push: {managers: msg.author.id}}, {new: true, safe: true});
+      }
 
-      // Managers can be added regardless of the raffle state.
-      return await addManager();
-    }, options);
+      if (guild.raffle.managers.length > 0) {
+        return `${msg.author.mention} now also manages the raffle.`;
+      } else {
+        return `${msg.author.mention} now manages the raffle.`;
+      }
+    };
 
-    // Register subcommands
-  }
+    // Managers can be added regardless of the raffle state.
+    return await addManager();
+  },
+  options: options,
 };

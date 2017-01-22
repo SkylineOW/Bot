@@ -83,9 +83,8 @@ const interval = require('redis-setinterval');
 const Redis = require('data/redis');
 const moment = require('moment');
 
-const status = require('./status');
+const status = require('./../../utils/status');
 
-const label = `raffle`;
 const options = {
   aliases: [],
   caseInsensitive: false,
@@ -108,89 +107,72 @@ const options = {
 };
 
 module.exports = {
-  RegisterCommand: (bot) => {
-    const command = bot.registerCommand(label, async(msg, args) => {
-      //Input validation
-      if (args.length > 0) {
-        return `Invalid usage. Do \`!help raffle\` to view proper usage.`;
-      }
+  exec: async(msg, args) => {
+    //Input validation
+    if (args.length > 0) {
+      return `Invalid usage. Do \`!help raffle\` to view proper usage.`;
+    }
 
-      let raffle = await Redis.multi()
-        .get(`Raffle:${msg.channel.guild.id}:status`)
-        .scard(`Raffle:${msg.channel.guild.id}:entries`)
-        .ttl(`Raffle:${msg.channel.guild.id}:timeout`)
-        .execAsync();
+    let raffle = await Redis.multi()
+      .get(`Raffle:${msg.channel.guild.id}:status`)
+      .scard(`Raffle:${msg.channel.guild.id}:entries`)
+      .ttl(`Raffle:${msg.channel.guild.id}:timeout`)
+      .execAsync();
 
-      //Helper function for controlling output message
-      const createStatus = async(raffle) => {
-        const fields = [
-          {
-            name: '❯ Status',
-            value: raffle[0],
-            inline: true,
-          },
-          {
-            name: '❯ Entries',
-            value: raffle[1],
-            inline: true,
-          }
-        ];
-
-        if (raffle[0] === status.inProgress) {
-          fields.push({
-            name: '❯ Time remaining',
-            value: determineTime(raffle[2]),
-            inline: true,
-          });
+    //Helper function for controlling output message
+    const createStatus = async(raffle) => {
+      const fields = [
+        {
+          name: '❯ Status',
+          value: raffle[0],
+          inline: true,
+        },
+        {
+          name: '❯ Entries',
+          value: raffle[1],
+          inline: true,
         }
+      ];
 
-        return await msg.channel.createMessage({
-          embed: {
-            color: 6897122,
-            author: {
-              name: `Raffle`,
-            },
-            fields: fields
-          }
+      if (raffle[0] === status.inProgress) {
+        fields.push({
+          name: '❯ Time remaining',
+          value: determineTime(raffle[2]),
+          inline: true,
         });
-      };
-
-      //Helper function to handle time conversion
-      const determineTime = (seconds) => {
-        switch (seconds) {
-          case 0:
-          case -1:
-          case -2:
-            return 'Indefinite';
-          default:
-            return moment().startOf('day').seconds(seconds).format('HH:mm:ss');
-        }
-      };
-
-      switch (raffle[0]) {
-        case status.inProgress:
-        case status.closed:
-          await createStatus(raffle);
-          break;
-        default:
-          return `A raffle is not running at this moment.`;
       }
 
-    }, options);
+      return await msg.channel.createMessage({
+        embed: {
+          color: 6897122,
+          author: {
+            name: `Raffle`,
+          },
+          fields: fields
+        }
+      });
+    };
 
-    // Register subcommands
-    require('./start').RegisterCommand(bot, command);
-    require('./enter').RegisterCommand(bot, command);
-    require('./close').RegisterCommand(bot, command);
-    require('./open').RegisterCommand(bot, command);
-    require('./finish').RegisterCommand(bot, command);
+    //Helper function to handle time conversion
+    const determineTime = (seconds) => {
+      switch (seconds) {
+        case 0:
+        case -1:
+        case -2:
+          return 'Indefinite';
+        default:
+          return moment().startOf('day').seconds(seconds).format('HH:mm:ss');
+      }
+    };
 
-    // Channel control
-    require('./add').RegisterCommand(bot, command);
-    require('./remove').RegisterCommand(bot, command);
-
-    // Mod control
-    require('./manage').RegisterCommand(bot, command);
-    require('./unmanage').RegisterCommand(bot, command);
-  }
+    switch (raffle[0]) {
+      case status.inProgress:
+      case status.closed:
+        await createStatus(raffle);
+        break;
+      default:
+        return `A raffle is not running at this moment.`;
+    }
+  },
+  options: options
 };

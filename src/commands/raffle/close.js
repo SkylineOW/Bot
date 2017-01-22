@@ -7,9 +7,8 @@ const async = require('async');
 const Guild = require('data/mongoose').models.Guild;
 const Redis = require('data/redis');
 
-const status = require('./status');
+const status = require('./../../utils/status');
 
-const label = 'close';
 const options = {
   aliases: [],
   caseInsensitive: false,
@@ -32,76 +31,71 @@ const options = {
 };
 
 module.exports = {
-  RegisterCommand: (bot, parent) => {
-    const command = parent.registerSubcommand(label, async(msg, args) => {
-      //Input validation
-      if (args.length > 0) {
-        return `Invalid usage. Do \`!help raffle close\` to view proper usage.`;
+  exec: async(msg, args) => {
+    //Input validation
+    if (args.length > 0) {
+      return `Invalid usage. Do \`!help raffle close\` to view proper usage.`;
+    }
+
+    let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
+
+    const closeRaffle = async() => {
+      // Fetch the guild
+      let guild = await Guild.findById(msg.channel.guild.id);
+
+      // This guild should exist and have settings since raffles cant start without a guild or settings.
+      if (!guild || !guild.raffle) {
+        //ToDo: Report this to the bot alert webhook for inspection.
+        return 'Something went wrong, please try again.';
       }
 
-      let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
+      guild = await new Promise((resolve) => {
+        // raffle should also exist since its created with the guild.
+        guild.populate('raffle', (error, result) => {
+          resolve(result);
+        });
+      });
 
-      const closeRaffle = async() => {
-        // Fetch the guild
-        let guild = await Guild.findById(msg.channel.guild.id);
-
-        // This guild should exist and have settings since raffles cant start without a guild or settings.
-        if (!guild || !guild.raffle) {
-          //ToDo: Report this to the bot alert webhook for inspection.
-          return 'Something went wrong, please try again.';
+      //Broadcast on all channels listed that the raffle is closed.
+      await async.each(guild.raffle.channels, async(channelId, callback) => {
+        //Skip the channel this was written.
+        if (channelId === msg.channel.id) {
+          return callback();
         }
 
-        guild = await new Promise((resolve) => {
-          // raffle should also exist since its created with the guild.
-          guild.populate('raffle', (error, result) => {
-            resolve(result);
-          });
-        });
+        console.log(`Close sent to channel: ${channelId}`);
+        callback();
+      });
 
-        //Broadcast on all channels listed that the raffle is closed.
-        await async.each(guild.raffle.channels, async (channelId, callback) => {
-          //Skip the channel this was written.
-          if(channelId === msg.channel.id)
-          {
-            return callback();
-          }
+      //Inform all managers about the raffle state.
+      await async.each(guild.raffle.managers, async(userId, callback) => {
+        //Skip the user that sent this message.
+        if (userId === msg.author.id) {
+          return callback();
+        }
 
-          console.log(`Close sent to channel: ${channelId}`);
-          callback();
-        });
+        console.log(`Close sent to manager: ${userId}`);
+        callback();
+      });
 
-        //Inform all managers about the raffle state.
-        await async.each(guild.raffle.managers, async (userId, callback) => {
-          //Skip the user that sent this message.
-          if(userId === msg.author.id)
-          {
-            return callback();
-          }
+      await Redis.multi()
+        .set(`Raffle:${msg.channel.guild.id}:status`, status.closed)
+        .del(`Raffle:${msg.channel.guild.id}:timeout`)
+        .execAsync();
 
-          console.log(`Close sent to manager: ${userId}`);
-          callback();
-        });
+      return 'The raffle is now closed.';
+    };
 
-        await Redis.multi()
-          .set(`Raffle:${msg.channel.guild.id}:status`, status.closed)
-          .del(`Raffle:${msg.channel.guild.id}:timeout`)
-          .execAsync();
-
-        return 'The raffle is now closed.';
-      };
-
-      switch (raffle) {
-        case status.inProgress:
-          return await closeRaffle();
-        case status.created:
-          return 'A raffle that has not started, cannot be closed.';
-        case status.closed:
-          return 'The raffle is already closed.';
-        default:
-          return 'A raffle that is not running, cannot be closed.';
-      }
-    }, options);
-
-    //Register subcommands
-  }
+    switch (raffle) {
+      case status.inProgress:
+        return await closeRaffle();
+      case status.created:
+        return 'A raffle that has not started, cannot be closed.';
+      case status.closed:
+        return 'The raffle is already closed.';
+      default:
+        return 'A raffle that is not running, cannot be closed.';
+    }
+  },
+  options: options
 };
