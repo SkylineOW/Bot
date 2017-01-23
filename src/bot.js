@@ -32,8 +32,11 @@ bot.on('ready', () => {
   console.log(`Ready! Guilds: ${bot.guilds.size}`);
 });
 
+//Needs to happen before commands are registered since some of them rely on this file.
+module.exports = bot;
+
 // Helper function for registering commands.
-const registerCommand = async(parent, dir, file, name) => {
+const registerCommand = async (parent, dir, file, name) => {
   try {
     const stat = fs.statSync(path.join(dir, file));
 
@@ -48,7 +51,7 @@ const registerCommand = async(parent, dir, file, name) => {
       });
 
       await Promise.all(subcmds.map((subcmd) => {
-        return new Promise(async(resolve) => {
+        return new Promise(async (resolve) => {
           await registerCommand(cmd, path.join(dir, file), subcmd, subcmd.slice(0, -3));
           resolve();
         });
@@ -76,13 +79,13 @@ const root = path.resolve(`${__dirname}/commands/`);
 const files = fs.readdirSync(root);
 
 Promise.all(files.map((file) => {
-  return new Promise(async(resolve) => {
+  return new Promise(async (resolve) => {
     await registerCommand(bot, root, file, file.slice(0, -3));
     resolve();
   });
 })).then(() => {
   // Connect bot to discord.
   bot.connect();
+}).catch((error) => {
+  console.log(error.stack);
 });
-
-module.exports = bot;
