@@ -27,47 +27,48 @@ const options = {
 };
 
 module.exports = {
-  exec: async(msg, args) => {
-      //Input validation
-      if (args.length > 0) {
-        return `Invalid usage. Do \`!help raffle add\` to view proper usage.`;
+  exec: async (msg, args) => {
+    //Input validation
+    if (args.length > 0) {
+      return `Invalid usage. Do \`!help raffle add\` to view proper usage.`;
+    }
+
+    const addChannel = async () => {
+      // Fetch the guild
+      let guild = await Guild.findById(msg.channel.guild.id);
+
+      if (!guild) {
+        // No guild, create a default one.
+        guild = await Guild.create({_id: msg.channel.guild.id});
       }
 
-      const addChannel = async() => {
-        // Fetch the guild
-        let guild = await Guild.findById(msg.channel.guild.id);
+      // If there are no raffle settings for this guild, create default based on message.
+      if (!guild.raffle) {
+        const raffle = await Raffle.create({channels: [msg.channel.id], guild: guild});
 
-        if (!guild) {
-          // No guild, create a default one.
-          guild = await Guild.create({_id: msg.channel.guild.id});
-        }
+        guild = await Guild.findByIdAndUpdate(msg.channel.guild.id, {raffle: raffle}, {new: true, safe: true});
+      } else {
 
-        // If there are no raffle settings for this guild, create default based on message.
-        if (!guild.raffle) {
-          const raffle = await Raffle.create({channels: [msg.channel.id], guild: guild});
-
-          guild = await Guild.findByIdAndUpdate(msg.channel.guild.id, {raffle: raffle}, {new: true, safe: true});
-        } else {
-
-          guild = await new Promise((resolve) => {
-            guild.populate('raffle', (error, result) => {
-              resolve(result);
-            });
+        guild = await new Promise((resolve) => {
+          guild.populate('raffle', (error, result) => {
+            resolve(result);
           });
+        });
 
-          //Check if the channel is registered.
-          if (guild.raffle.channels.indexOf(msg.channel.id) !== -1) {
-            return 'The raffle already uses this channel.';
-          }
-
-          await Raffle.findByIdAndUpdate(guild.raffle._id, {$push: {channels: msg.channel.id}}, {new: true, safe: true});
+        //Check if the channel is registered.
+        if (guild.raffle.channels.indexOf(msg.channel.id) !== -1) {
+          return 'The raffle already uses this channel.';
         }
 
-        return 'The raffle now uses this channel.';
-      };
+        await Raffle.findByIdAndUpdate(guild.raffle._id, {$push: {channels: msg.channel.id}}, {new: true, safe: true});
+      }
 
-      // Channels can be added regardless of the raffle state.
-      return await addChannel();
-    },
+      return 'The raffle now uses this channel.';
+    };
+
+    // Channels can be added regardless of the raffle state.
+    return await addChannel();
+  },
   options: options
 };
+

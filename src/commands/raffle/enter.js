@@ -4,9 +4,8 @@
 
 const Redis = require('data/redis');
 
-const status = require('./../../utils/status');
+const status = require('utils/status');
 
-const label = 'enter';
 const options = {
   aliases: [],
   caseInsensitive: false,
@@ -29,10 +28,10 @@ const options = {
 };
 
 module.exports = {
-  exec: async(msg, args) => {
+  exec: async (msg, args) => {
     // Input validation
 
-    const joinRaffle = async() => {
+    const joinRaffle = async () => {
       // Check if the user is on the list
       const entries = await Redis.smembersAsync(`Raffle:${msg.channel.guild.id}:entries`);
 

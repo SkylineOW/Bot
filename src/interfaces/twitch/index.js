@@ -13,10 +13,9 @@ module.exports = {
    * @param channel Channel string to query for.
    */
   getChannel: async function (channel) {
-    try
-    {
+    try {
       return await axios.get(`https://api.twitch.tv/kraken/channels/${channel}`, {
-        headers: { 'Client-ID': config.twitch.client_id },
+        headers: {'Client-ID': config.twitch.client_id},
       });
     }
     catch (error) {
@@ -31,7 +30,7 @@ module.exports = {
    */
   getStream: function (channel) {
     return axios.get(`https://api.twitch.tv/kraken/streams/${channel}`, {
-      headers: { 'Client-ID': config.twitch.client_id },
+      headers: {'Client-ID': config.twitch.client_id},
     });
   },
 };

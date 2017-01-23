@@ -7,7 +7,7 @@ const async = require('async');
 const Guild = require('data/mongoose').models.Guild;
 const Redis = require('data/redis');
 
-const status = require('./../../utils/status');
+const status = require('utils/status');
 
 const options = {
   aliases: [],
@@ -31,7 +31,7 @@ const options = {
 };
 
 module.exports = {
-  exec: async(msg, args) => {
+  exec: async (msg, args) => {
     //Input validation
     if (args.length > 0) {
       return `Invalid usage. Do \`!help raffle close\` to view proper usage.`;
@@ -39,7 +39,7 @@ module.exports = {
 
     let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
 
-    const closeRaffle = async() => {
+    const closeRaffle = async () => {
       // Fetch the guild
       let guild = await Guild.findById(msg.channel.guild.id);
 
@@ -57,7 +57,7 @@ module.exports = {
       });
 
       //Broadcast on all channels listed that the raffle is closed.
-      await async.each(guild.raffle.channels, async(channelId, callback) => {
+      await async.each(guild.raffle.channels, async (channelId, callback) => {
         //Skip the channel this was written.
         if (channelId === msg.channel.id) {
           return callback();
@@ -68,7 +68,7 @@ module.exports = {
       });
 
       //Inform all managers about the raffle state.
-      await async.each(guild.raffle.managers, async(userId, callback) => {
+      await async.each(guild.raffle.managers, async (userId, callback) => {
         //Skip the user that sent this message.
         if (userId === msg.author.id) {
           return callback();

@@ -83,14 +83,14 @@ const interval = require('redis-setinterval');
 const Redis = require('data/redis');
 const moment = require('moment');
 
-const status = require('./../../utils/status');
+const status = require('utils/status');
 
 const options = {
   aliases: [],
   caseInsensitive: false,
   deleteCommand: false,
   argsRequired: false,
-  guildOnly: true,
+  guildOnly: false,
   dmOnly: false,
   description: `A raffle for drawing teams or individuals from a group of people.`,
   fullDescription: `Adding no subcommand will return the status of the raffle (if one is active)`,
@@ -107,7 +107,7 @@ const options = {
 };
 
 module.exports = {
-  exec: async(msg, args) => {
+  exec: async (msg, args) => {
     //Input validation
     if (args.length > 0) {
       return `Invalid usage. Do \`!help raffle\` to view proper usage.`;
@@ -120,7 +120,7 @@ module.exports = {
       .execAsync();
 
     //Helper function for controlling output message
-    const createStatus = async(raffle) => {
+    const createStatus = async (raffle) => {
       const fields = [
         {
           name: '❯ Status',

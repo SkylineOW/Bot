@@ -91,6 +91,7 @@
 //   },
 // });
 module.exports = {
-  exec: async (msg, args) => {},
+  exec: async (msg, args) => {
+  },
   options: {}
 };

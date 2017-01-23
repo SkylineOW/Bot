@@ -27,11 +27,11 @@ const options = {
 };
 
 module.exports = {
-  exec: async(msg, args) => {
+  exec: async (msg, args) => {
     // Input validation
     // ToDo: Implement adding mentioned users and not just the command user.
 
-    const addManager = async() => {
+    const addManager = async () => {
       // Fetch the guild
       let guild = await Guild.findById(msg.channel.guild.id);
 

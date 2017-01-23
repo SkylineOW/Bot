@@ -27,11 +27,11 @@ const options = {
 };
 
 module.exports = {
-  exec: async(msg, args) => {
+  exec: async (msg, args) => {
     // Input validation
     // ToDo: Implement removing mentioned users and not just the command user.
 
-    const removeManager = async() => {
+    const removeManager = async () => {
       // Fetch the guild
       let guild = await Guild.findById(msg.channel.guild.id);
 

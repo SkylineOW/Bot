@@ -27,7 +27,7 @@ module.exports = {
    * @param since_id
    * @param callback
    */
-  getLatest: function(user, since_id, callback) {
+  getLatest: function (user, since_id, callback) {
     return client.get('statuses/user_timeline', {
       screen_name: user,
       since_id: since_id,

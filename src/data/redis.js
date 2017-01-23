@@ -17,7 +17,7 @@ client.on('connect', () => {
 });
 
 client.on('reconnect', () => {
- console.log('Redis reconnecting...');
+  console.log('Redis reconnecting...');
 });
 
 client.on('error', (error) => {

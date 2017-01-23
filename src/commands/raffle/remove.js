@@ -5,7 +5,6 @@
 const Guild = require('data/mongoose').models.Guild;
 const Raffle = require('data/mongoose').models.Raffle;
 
-const label = 'remove';
 const options = {
   aliases: [],
   caseInsensitive: false,
@@ -28,13 +27,13 @@ const options = {
 };
 
 module.exports = {
-  exec: async(msg, args) => {
+  exec: async (msg, args) => {
     // Input validation
     if (args.length > 0) {
       return `Invalid usage. Do \`!help raffle remove\` to view proper usage.`;
     }
 
-    const removeChannel = async() => {
+    const removeChannel = async () => {
       // Fetch the guild
       let guild = await Guild.findById(msg.channel.guild.id);
 

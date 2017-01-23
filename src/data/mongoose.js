@@ -31,8 +31,10 @@ mongoose.connection.on("connected", () => {
 });
 
 mongoose.connection.on("open", () => {
-  mongoose.models.Log.create({ type: 'db_startup', value: 'Success'}, (error) => {
-    if(error) { console.log(`Error: ${error}`); }
+  mongoose.models.Log.create({type: 'db_startup', value: 'Success'}, (error) => {
+    if (error) {
+      console.log(`Error: ${error}`);
+    }
     console.log("db open");
   });
 });

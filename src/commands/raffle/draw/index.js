@@ -25,6 +25,7 @@ const options = {
 
 module.exports = {
   label: 'draw',
-  exec: async(msg, args) => {},
+  exec: async (msg, args) => {
+  },
   options: options
 };
