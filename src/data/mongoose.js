@@ -8,16 +8,12 @@ const mongoose = require('mongoose');
 const config = require('../config');
 
 //Models for mongoose
-mongoose.models.Answer = require('./models/answers');
-mongoose.models.Broadcast = require('./models/broadcasts.js');
-mongoose.models.Log = require('./models/logs');
-mongoose.models.Raffle = require('./models/raffles');
-mongoose.models.Profile = require('./models/profiles');
-mongoose.models.Question = require('./models/questions');
-mongoose.models.Guild = require('./models/guilds');
-mongoose.models.Task = require('./models/tasks');
-mongoose.models.User = require('./models/users');
+// ToDo: Create a model auto-loader to pull in everything in the models folder.
+require('./models/raffles');
+require('./models/guilds');
+require('./models/users');
 
+// ToDo: Create neat notification messages using chalk.
 mongoose.connection.on("connecting", () => {
   console.log("db connecting...");
 });
@@ -31,12 +27,7 @@ mongoose.connection.on("connected", () => {
 });
 
 mongoose.connection.on("open", () => {
-  mongoose.models.Log.create({type: 'db_startup', value: 'Success'}, (error) => {
-    if (error) {
-      console.log(`Error: ${error}`);
-    }
-    console.log("db open");
-  });
+  console.log("db open");
 });
 
 mongoose.connection.on("reconnected", () => {
@@ -51,8 +42,10 @@ mongoose.AddConnectionEvent = (event, func) => {
   mongoose.connection.on(event, func);
 };
 
-//Database connection via mongoose
+// Swap out default promise library for something better.
 mongoose.Promise = bluebird;
+
+// Database connection via mongoose
 mongoose.connect(config.mongoose.database_url);
 
 module.exports = mongoose;
