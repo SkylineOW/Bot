@@ -15,6 +15,7 @@
 const Eris = require('eris');
 const fs = require('fs');
 const path = require('path');
+const pe = require('utils/error');
 
 const config = require('./config');
 
@@ -70,7 +71,7 @@ const registerCommand = async (parent, dir, file, name) => {
     return await parent.registerSubcommand(name, data.exec, data.options);
   }
   catch (error) {
-    console.log(`${path.join(dir, file)} could not be loaded:\n${error.stack}`);
+    console.log(`${path.join(dir, file)} could not be loaded:\n` + pe.render(error));
   }
 };
 
@@ -87,5 +88,5 @@ Promise.all(files.map((file) => {
   // Connect bot to discord.
   bot.connect();
 }).catch((error) => {
-  console.log(error.stack);
+  console.log(pe.render(error));
 });

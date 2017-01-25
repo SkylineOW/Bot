@@ -4,13 +4,12 @@
 
 const cluster = require('cluster');
 
-if(cluster.isMaster) {
+if (cluster.isMaster) {
   // Everything in here is on the cluster master.
   const CpuCount = require('os').cpus().length;
   console.log(`Master ${process.pid} is running.`);
 
-  for(let i = 0; i < CpuCount; i++)
-  {
+  for (let i = 0; i < CpuCount; i++) {
     cluster.fork();
   }
 
@@ -64,10 +63,9 @@ if(cluster.isMaster) {
 
   console.log(`Worker ${process.pid} started`);
 
-  const CreateTask = async function ()
-  { let i = 0;
-    while(i < 50)
-    {
+  const CreateTask = async function () {
+    let i = 0;
+    while (i < 50) {
       //const task = await Task.create({
       //  status: 'ready',
       //  last_performed: Date.now(),
@@ -75,14 +73,13 @@ if(cluster.isMaster) {
       //});
 
 
-      const task = await Task.findOneAndUpdate({ status: 'ready' },
-        { status: 'refreshing', target: `${process.pid}-${i}`},
-        { sort: { last_performed: 1} }).catch((error) => {
+      const task = await Task.findOneAndUpdate({status: 'ready'},
+        {status: 'refreshing', target: `${process.pid}-${i}`},
+        {sort: {last_performed: 1}}).catch((error) => {
         console.log(error);
       });
 
-      if(task && task.target)
-      {
+      if (task && task.target) {
         console.log(`${process.pid}-${i} -> ` + task.target);
         i++;
       } else {

@@ -3,11 +3,13 @@ const redis = require('redis');
 
 const config = require('../config');
 
+// Swap out default promise library for something better.
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
 
 const client = redis.createClient(config.redis.url);
 
+// ToDo: Create neat notification messages using chalk.
 client.on('ready', () => {
   console.log(`Redis connected`);
 });

@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-//Hack to allow module importimg from application root.
+// Allow module importing from application root.
 process.env.NODE_PATH = __dirname;
 require('module').Module._initPaths();
 
@@ -21,15 +21,15 @@ const twitter = require('interfaces/twitter');
 const app = express(http);
 
 app.use(cookieParser());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 
 app.get('/', (req, res) => {
   res.send('<div>Server is ok!!</div>');
 });
 
-app.get('/profile', (req, res) => {
-  ow_api.getAll('oOCKYOo-2410').then((response) => {
+app.get('/profile/:user', (req, res) => {
+  ow_api.getAll(req.params.user).then((response) => {
     res.send(response.data);
   }).catch((error) => {
     res.send(error);
@@ -38,8 +38,7 @@ app.get('/profile', (req, res) => {
 
 app.get('/channel/:user', (req, res) => {
   twitch.getChannel(req.params.user).then((response) => {
-    if(response.status !== 200)
-    {
+    if (response.status !== 200) {
       return res.send(response);
     }
 
@@ -55,7 +54,7 @@ app.get('/stream/:user', (req, res) => {
 
 app.get('/tweets', (req, res) => {
   twitter.getLatest('skyline_ow', 816086637172105200, (error, tweets) => {
-    if(error) {
+    if (error) {
       res.send(error);
     }
 
@@ -64,12 +63,12 @@ app.get('/tweets', (req, res) => {
 });
 
 app.use('*', (req, res) => {
-  res.send({ message: 'Page does not exist'});
+  res.send({message: 'Page does not exist'});
 });
 
 // Error handling
 app.use((err, req, res) => {
-  res.send({ error: err.message });
+  res.send({error: err.message});
 });
 
 app.listen(config.port, () => {
