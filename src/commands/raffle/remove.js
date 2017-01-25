@@ -1,9 +1,9 @@
 /**
- * Command for removing the raffle outputs from the channel this is typed in.
+ * Command for removing the raffle outputs from the channel this is typed in
  */
+const pe = require('utils/error');
 
-const Guild = require('data/mongoose').models.Guild;
-const Raffle = require('data/mongoose').models.Raffle;
+const Raffle = require('utils/raffle');
 
 const options = {
   aliases: [],
@@ -33,37 +33,12 @@ module.exports = {
       return `Invalid usage. Do \`!help raffle remove\` to view proper usage.`;
     }
 
-    const removeChannel = async () => {
-      // Fetch the guild
-      let guild = await Guild.findById(msg.channel.guild.id);
-
-      if (!guild || !guild.raffle) {
-        // No guild, exit out.
-        return `The raffle does not use this channel.`;
-      }
-
-      guild = await new Promise((resolve) => {
-        guild.populate('raffle', (error, result) => {
-          resolve(result);
-        });
-      });
-
-      if (guild.raffle.channels.indexOf(msg.channel.id) === -1) {
-        return `The raffle does not use this channel.`;
-      }
-
-      // Raffle needs at least 1 channel to post results in.
-      if (guild.raffle.channels.length <= 1) {
-        return 'The raffle needs at least one channel to post results in.\nPlease add another channel before removing this one.';
-      }
-
-      await Raffle.findByIdAndUpdate(guild.raffle._id, {$pull: {channels: msg.channel.id}}, {new: true, safe: true});
-      return `The raffle no longer uses this channel.`;
-    };
-
-    // Channels can be removed regardless of the raffle state.
-    return await removeChannel();
-
+    try {
+      return await Raffle.removeChannel(msg.channel);
+    }
+    catch (error) {
+      console.log(pe.render(error));
+    }
   },
   options: options,
 };

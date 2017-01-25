@@ -1,17 +1,17 @@
 /**
- * Command for entering into a running raffle.
+ * Command for entering into a running raffle
  */
+const pe = require('utils/error');
 
-const Redis = require('data/redis');
-
-const status = require('utils/status');
+const Guild = require('utils/guild');
+const Raffle = require('utils/raffle');
 
 const options = {
   aliases: [],
   caseInsensitive: false,
   deleteCommand: false,
   argsRequired: false,
-  guildOnly: true,
+  guildOnly: false,
   dmOnly: false,
   description: `Enter an ongoing raffle.`,
   fullDescription: ``,
@@ -29,34 +29,18 @@ const options = {
 
 module.exports = {
   exec: async (msg, args) => {
-    // Input validation
+    //Input validation
+    if (args.length > 0) {
+      return `Invalid usage. Do \`!help raffle enter\` to view proper usage.`;
+    }
 
-    const joinRaffle = async () => {
-      // Check if the user is on the list
-      const entries = await Redis.smembersAsync(`Raffle:${msg.channel.guild.id}:entries`);
-
-      if (!entries || (entries && entries.indexOf(msg.author.id) === -1)) {
-        //List does not exist, create it with the user's id.
-
-        const result = await Redis.saddAsync([`Raffle:${msg.channel.guild.id}:entries`, msg.author.id]);
-
-        return `${msg.author.mention} has entered.`;
-      }
-
-      return `You have already entered the lottery ${msg.author.mention}`;
-    };
-
-    //Get the raffle status from redis for this guild.
-    let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
-
-    switch (raffle) {
-      case status.inProgress:
-        return await joinRaffle();
-      case status.closed:
-      case status.finished:
-        return `The lottery is not accepting entries at this time ${msg.author.mention}`;
-      default:
-        return `There is no lottery happening right now.`;
+    try {
+      return await Guild.determine(msg, async (guildId) => {
+        return await Raffle.enter(guildId, msg.author);
+      });
+    }
+    catch (error) {
+      console.log(pe.render(error));
     }
   },
   options: options

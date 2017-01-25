@@ -1,20 +1,18 @@
 /**
- * Command that concludes a raffle and cleans everything up for a new raffle to start.
+ * Command that concludes a raffle and cleans everything up for a new raffle to start
  */
 
-const async = require('async');
+const pe = require('utils/error');
 
-const Guild = require('data/mongoose').models.Guild;
-const Redis = require('data/redis');
-
-const status = require('utils/status');
+const Raffle = require('utils/raffle');
+const Guild = require('utils/guild');
 
 const options = {
   aliases: [],
   caseInsensitive: false,
   deleteCommand: false,
   argsRequired: false,
-  guildOnly: true,
+  guildOnly: false,
   dmOnly: false,
   description: `Conclude a raffle, cleaning up entries and results.`,
   fullDescription: ``,
@@ -33,62 +31,17 @@ const options = {
 module.exports = {
   exec: async (msg, args) => {
     // Input validation
+    if (args.length > 0) {
+      return `Invalid usage. Do \`!help raffle finish\` to view proper usage.`;
+    }
 
-    const finishRaffle = async () => {
-      // Fetch the guild
-      let guild = await Guild.findById(msg.channel.guild.id);
-
-      // This guild should exist and have settings since raffles cant start without a guild or settings.
-      if (!guild || !guild.raffle) {
-        //ToDo: Report this to the bot alert webhook for inspection.
-        return 'Something went wrong, please try again.';
-      }
-
-      guild = await new Promise((resolve) => {
-        guild.populate('raffle', (error, result) => {
-          resolve(result);
-        });
+    try {
+      return await Guild.determine(msg, async (guildId) => {
+        return await Raffle.finish(guildId);
       });
-
-      //Broadcast on all channels listed that the raffle is closed.
-      await async.each(guild.raffle.channels, async (channelId, callback) => {
-        //Skip the channel this was written.
-        if (channelId === msg.channel.id) {
-          return callback();
-        }
-
-        console.log(channelId);
-        callback();
-      });
-
-      //Inform all managers about the raffle state.
-      await async.each(guild.raffle.managers, async (userId, callback) => {
-        //Skip the user that sent this message.
-        if (userId === msg.author.id) {
-          return callback();
-        }
-
-        console.log(userId);
-        callback();
-      });
-
-      await Redis.multi()
-        .del(`Raffle:${msg.channel.guild.id}:status`)
-        .del(`Raffle:${msg.channel.guild.id}:entries`)
-        .del(`Raffle:${msg.channel.guild.id}:timeout`)
-        .execAsync();
-
-      return 'The raffle has finished.';
-    };
-
-    let raffle = await Redis.getAsync(`Raffle:${msg.channel.guild.id}:status`);
-
-    switch (raffle) {
-      case status.inProgress:
-      case status.closed:
-        return await finishRaffle();
-      default:
-        return `The raffle is already finished.`;
+    }
+    catch (error) {
+      console.log(pe.render(error));
     }
   },
   options: options

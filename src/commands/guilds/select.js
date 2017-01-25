@@ -1,22 +1,22 @@
 /**
- * Command for starting a raffle
+ * Command for selecting a guild dm commands should be issued for.
  */
 
 const pe = require('utils/error');
 
 const Guild = require('utils/guild');
-const Raffle = require('utils/raffle');
+const User = require('utils/user');
 
 const options = {
   aliases: [],
   caseInsensitive: false,
   deleteCommand: false,
-  argsRequired: false,
+  argsRequired: true, // Guild number is required.
   guildOnly: false,
-  dmOnly: false,
-  description: `Start a raffle that people can enter.`,
-  fullDescription: '',
-  usage: '\`mins\`',
+  dmOnly: true, // Dm only since this is irrelevant when using commands in a guild.
+  description: `Select a guild which all dm commands will be issued for.`,
+  fullDescription: '', //ToDo: Fill in a proper description of the command.
+  usage: '\`number\`',
   requirements: {
     userIDs: [],
     permissions: {},
@@ -35,14 +35,13 @@ const checkInput = (value) => {
 
 module.exports = {
   exec: async (msg, args) => {
-    if (args[0] && checkInput(args[0])) {
-      return `Invalid usage. Do \`!help raffle start\` to view proper usage.`;
+    // Only 1 argument and it should be an acceptable value.
+    if (args.length > 1 || checkInput(args[0])) {
+      return `Invalid usage. Do \`!help guilds select\` to view proper usage.`;
     }
 
     try {
-      return await Guild.determine(msg, async (guildId) => {
-        return await Raffle.start(guildId, args[0]);
-      });
+      return await Guild.select(msg, args[0]);
     }
     catch (error) {
       console.log(pe.render(error));

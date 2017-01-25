@@ -23,13 +23,13 @@
  * - draw (CONFIG): draw based on the requested config.
  *  - teams:
  *   - draw one person at a time and alternate them into teams.
- *   - draw a total of 12 people, resulting in 2 teams of 6.
+ *   - draw according to input (12, 6v6, 4v4, ect.)
  *   - give them X amount of time to reply to the bot with their battle tag.
- *   - TODO: Users with claimed profiles do not need replay as their will be fetched.
+ *   - TODO: Users with claimed profiles do not need reply as their battle tag will be fetched.
  *   - if time expires on a person, draw an new individual until 12 replied.
  *
- * - add: add the channel to the list where announcements should appear
- * - remove: remove the channel from the list where announcements should appear
+ * - add: add the channel to the list where announcements should appear.
+ * - remove: remove the channel from the list where announcements should appear.
  *
  * - manage: join the list of managers.
  * - unmanage: leave the list of managers.
@@ -78,12 +78,10 @@
 //   ],
 // }
 
-const interval = require('redis-setinterval');
+const pe = require('utils/error');
 
-const Redis = require('data/redis');
-const moment = require('moment');
-
-const status = require('utils/status');
+const Raffle = require('utils/raffle');
+const Guild = require('utils/guild');
 
 const options = {
   aliases: [],
@@ -108,70 +106,18 @@ const options = {
 
 module.exports = {
   exec: async (msg, args) => {
-    //Input validation
+    // Input validation
     if (args.length > 0) {
       return `Invalid usage. Do \`!help raffle\` to view proper usage.`;
     }
 
-    let raffle = await Redis.multi()
-      .get(`Raffle:${msg.channel.guild.id}:status`)
-      .scard(`Raffle:${msg.channel.guild.id}:entries`)
-      .ttl(`Raffle:${msg.channel.guild.id}:timeout`)
-      .execAsync();
-
-    //Helper function for controlling output message
-    const createStatus = async (raffle) => {
-      const fields = [
-        {
-          name: '❯ Status',
-          value: raffle[0],
-          inline: true,
-        },
-        {
-          name: '❯ Entries',
-          value: raffle[1],
-          inline: true,
-        }
-      ];
-
-      if (raffle[0] === status.inProgress) {
-        fields.push({
-          name: '❯ Time remaining',
-          value: determineTime(raffle[2]),
-          inline: true,
-        });
-      }
-
-      return await msg.channel.createMessage({
-        embed: {
-          color: 6897122,
-          author: {
-            name: `Raffle`,
-          },
-          fields: fields
-        }
+    try {
+      return await Guild.determine(msg, async (guildId) => {
+        return await Raffle.info(guildId, msg.channel);
       });
-    };
-
-    //Helper function to handle time conversion
-    const determineTime = (seconds) => {
-      switch (seconds) {
-        case 0:
-        case -1:
-        case -2:
-          return 'Indefinite';
-        default:
-          return moment().startOf('day').seconds(seconds).format('HH:mm:ss');
-      }
-    };
-
-    switch (raffle[0]) {
-      case status.inProgress:
-      case status.closed:
-        await createStatus(raffle);
-        break;
-      default:
-        return `A raffle is not running at this moment.`;
+    }
+    catch (error) {
+      console.log(pe.render(error));
     }
   },
   options: options

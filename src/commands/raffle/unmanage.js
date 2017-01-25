@@ -2,15 +2,18 @@
  * Command for leaving manager list
  */
 
-const Guild = require('data/mongoose').models.Guild;
-const Raffle = require('data/mongoose').models.Raffle;
+const async = require('async');
+const pe = require('utils/error');
+
+const Raffle = require('utils/raffle');
+const Guild = require('utils/guild');
 
 const options = {
   aliases: [],
   caseInsensitive: false,
   deleteCommand: false,
   argsRequired: false,
-  guildOnly: true,
+  guildOnly: false,
   dmOnly: false,
   description: `Leave the list to receive raffle results or mention people to remove them.`,
   fullDescription: ``,
@@ -26,36 +29,38 @@ const options = {
   permissionMessage: 'permissions'
 };
 
+const checkInput = (value) => {
+  // Only custom mentions format is allowed.
+  return value.match(/^<@\d*>$/) === null;
+};
+
 module.exports = {
   exec: async (msg, args) => {
+    let users = [];
+
     // Input validation
-    // ToDo: Implement removing mentioned users and not just the command user.
-
-    const removeManager = async () => {
-      // Fetch the guild
-      let guild = await Guild.findById(msg.channel.guild.id);
-
-      if (!guild || !guild.raffle) {
-        //No guild, exit out.
-        return `${msg.author.mention} is not managing the raffle.`;
+    if (args.length > 0) {
+      for (let i = 0; i < args.length; i++) {
+        if (checkInput(args[i])) {
+          return `Only mentions are allowed as inputs for this command. For more info use \`!help raffle manage\``;
+        }
       }
 
-      guild = await new Promise((resolve) => {
-        guild.populate('raffle', (error, result) => {
-          resolve(result);
-        });
+      await async.each(msg.mentions, (mention) => {
+        users.push(mention);
       });
+    } else {
+      users.push(msg.author);
+    }
 
-      if (guild.raffle.managers.indexOf(msg.author.id) === -1) {
-        return `${msg.author.mention} is not managing the raffle.`;
-      }
-
-      await Raffle.findByIdAndUpdate(guild.raffle._id, {$pull: {managers: msg.author.id}}, {new: true, safe: true});
-      return `The raffle is no longer managed by ${msg.author.mention}`;
-    };
-
-    // Managers can be removed regardless of the raffle state.
-    return await removeManager();
+    try {
+      return await Guild.determine(msg, async (guildId) => {
+        return await Raffle.removeManagers(guildId, users);
+      });
+    }
+    catch (error) {
+      console.log(pe.render(error));
+    }
   },
   options: options,
 };
