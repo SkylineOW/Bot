@@ -23,7 +23,9 @@ const options = {
   usage: ``,
   requirements: {
     userIDs: [],
-    permissions: {},
+    permissions: {
+      'sendMessages': true,
+    },
     roleIDs: [],
     roleNames: []
   },
@@ -48,5 +50,5 @@ module.exports = {
       console.log(pe.render(error));
     }
   },
-  options: options
+  options
 };

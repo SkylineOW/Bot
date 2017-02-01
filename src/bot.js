@@ -73,13 +73,26 @@ const config = require('./config');
 const mongoose = require('data/mongoose');
 
 const bot = new Eris.CommandClient(config.discord.token, {}, {
+  defaultHelpCommand: true,
+  name: 'Zenbot',
   description: 'A helpful omnic to help lighten the load of mods.',
-  author: 'Ocky and omni5cience',
+  owner: 'Ocky and omni5cience',
   prefix: config.prefix,
+  defaultCommandOptions: {
+    requirements: {
+      userIDs: [],
+      permissions: {
+        'sendMessages': true,
+      },
+      roleIDs: [],
+      roleNames: []
+    },
+  }
 });
 
 // Event handling for the bot.
 bot.on('ready', () => {
+
   // Start an interval for starting monitoring tasks for various guilds.
   const startMonitoring = async () => {
     // Only start this if we have storage connections.

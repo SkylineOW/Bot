@@ -145,9 +145,9 @@ const enter = async (guildId, user) => {
       return `You have already entered the raffle ${user.mention}`;
     case state.closed:
     case state.finished:
-      return `The lottery is not accepting entries at this time ${user.mention}`;
+      return `The raffle is not accepting entries at this time ${user.mention}`;
     default:
-      return `There is no lottery happening right now.`;
+      return `There is no raffle happening right now.`;
   }
 };
 
