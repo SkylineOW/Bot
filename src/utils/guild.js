@@ -4,6 +4,39 @@ const Guild = require('data/models/guilds');
 const User = require('utils/user');
 
 /**
+ * Determine which guild a command is for
+ * @param msg The command message
+ * @param func A function that should be executed with the correct guildId
+ * @returns {Promise.<String>}
+ */
+const determine = async (msg, func) => {
+  // Check if this message is a dm or not.
+  if (msg.member) {
+    // Message is posted in a guild
+    return await func(msg.channel.guild.id);
+  }
+
+  // This is a dm.
+  // Find the guilds the bot and user have in common.
+  const guilds = getGuilds(msg.author.id);
+
+  // If there is only 1 guild, assume its the guild the user want to control.
+  if (guilds.length === 1) {
+    return await func(guilds[0].id);
+  }
+
+  // Check if the user has a selected guild.
+  const user = await User.fetchOrCreate(msg.author.id);
+
+  if (!user || !user.guild) {
+    return `Please use \`!guilds select\` to specify the guild this command is meant for first.`;
+  }
+
+  // User has a selected guild, start raffle of that guild.
+  return await func(user.guild);
+};
+
+/**
  * Tries to find a guild with the given ID
  * @param guildId ID of the guild to find or create
  * @returns {Promise.<Query>}
@@ -43,49 +76,6 @@ const getGuilds = (UserId) => {
   }).sort((a, b) => {
     return a.id - b.id;
   });
-};
-
-/**
- * Determine which guild a command is for
- * @param msg The command message
- * @param func A function that should be executed with the correct guildId
- * @returns {Promise.<String>}
- */
-const determine = async (msg, func) => {
-  // Check if this message is a dm or not.
-  if (msg.member) {
-    // Message is posted in a guild
-    return await func(msg.channel.guild.id);
-  }
-
-  // This is a dm.
-  // Find the guilds the bot and user have in common.
-  const guilds = getGuilds(msg.author.id);
-
-  // If there is only 1 guild, assume its the guild the user want to control.
-  if (guilds.length === 1) {
-    return await func(guilds[0].id);
-  }
-
-  // Check if the user has a selected guild.
-  const user = await User.fetchOrCreate(msg.author.id);
-
-  if (!user || !user.guild) {
-    return `Please use \`!guilds select\` to specify the guild this command is meant for first.`;
-  }
-
-  // User has a selected guild, start raffle of that guild.
-  return await func(user.guild);
-};
-
-/**
- * Sets a guild's raffle equal to the provided raffle
- * @param guildId ID of guild to change.
- * @param raffle New value of raffle
- * @returns {Promise.<Query>}
- */
-const setRaffle = async (guildId, raffle) => {
-  return await Guild.findByIdAndUpdate(guildId, {raffle: raffle}, {new: true, safe: true});
 };
 
 /**
@@ -132,6 +122,16 @@ const info = async (msg) => {
 };
 
 /**
+ * Sets a guild's raffle equal to the provided raffle
+ * @param guildId ID of guild to change.
+ * @param raffle New value of raffle
+ * @returns {Promise.<Query>}
+ */
+const setRaffle = async (guildId, raffle) => {
+  return await Guild.findByIdAndUpdate(guildId, {raffle: raffle}, {new: true, safe: true});
+};
+
+/**
  * Sets the guild a user is commanding
  * @param msg Command message
  * @param selection Chosen guild number
@@ -153,11 +153,11 @@ const select = async (msg, selection) => {
 };
 
 module.exports = {
-  info,
   determine,
   fetch,
   fetchOrCreate,
+  info,
   getGuilds,
-  select,
   setRaffle,
+  select
 };
