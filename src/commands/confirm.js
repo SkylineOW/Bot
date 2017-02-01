@@ -52,7 +52,7 @@ module.exports = {
     try {
       return await Guild.determine(msg, async (guildId) => {
         return await Raffle.confirm(guildId, msg.author.id, args[0]);
-      });
+      }, options);
     }
     catch (error) {
       console.log(pe.render(error));

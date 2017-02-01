@@ -45,7 +45,7 @@ module.exports = {
     try {
       return await Guild.determine(msg, async (guildId) => {
         return await Raffle.finish(guildId);
-      });
+      }, options);
     }
     catch (error) {
       console.log(pe.render(error));

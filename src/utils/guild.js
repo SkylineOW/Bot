@@ -9,7 +9,7 @@ const User = require('utils/user');
  * @param func A function that should be executed with the correct guildId
  * @returns {Promise.<String>}
  */
-const determine = async (msg, func) => {
+const determine = async (msg, func, options) => {
   // Check if this message is a dm or not.
   if (msg.member) {
     // Message is posted in a guild
@@ -22,7 +22,15 @@ const determine = async (msg, func) => {
 
   // If there is only 1 guild, assume its the guild the user want to control.
   if (guilds.length === 1) {
-    return await func(guilds[0].id);
+    const member = guilds[0].members.find((member) => {
+      return msg.author.id === member.id;
+    });
+
+    if (checkPermissions(member, guilds[0], options)) {
+      return await func(guilds[0].id);
+    } else {
+      return `Command cannot be used here or you do not have sufficient permissions.`;
+    }
   }
 
   // Check if the user has a selected guild.
@@ -32,8 +40,70 @@ const determine = async (msg, func) => {
     return `Please use \`!guilds select\` to specify the guild this command is meant for first.`;
   }
 
-  // User has a selected guild, start raffle of that guild.
-  return await func(user.guild);
+  const guild = guilds.find((guild) => {
+    return guild.id === user.guild;
+  });
+
+  const member = guild.members.find((member) => {
+    return msg.author.id === member.id;
+  });
+
+  if (checkPermissions(member, guild, options)) {
+    return await func(user.guild);
+  } else {
+    return `Command cannot be used here or you do not have sufficient permissions.`;
+  }
+};
+
+/**
+ * Permission checking for dm's to ensure the person has the correct guild permissions for using the message.
+ * @param member Member of the guild sending the message
+ * @param guild Guild the command is directed at
+ * @param options Command options dictating the required permissions of the command.
+ * @returns {boolean}
+ */
+const checkPermissions = (member, guild, options) => {
+  if (options && options.requirements) {
+    console.log('Command needs permissions');
+    // Permission check
+    let keys = Object.keys(options.requirements.permissions);
+    if (keys.length > 0) {
+      let permissions = member.permission.json;
+
+      for (let key of keys) {
+        if (options.requirements.permissions[key] !== permissions[key]) {
+          return false;
+        }
+      }
+    }
+
+    // Role id's check
+    if (options.requirements.roleIDs.length > 0) {
+      console.log('Command needs role IDs');
+      for (let roleID of options.requirements.roleIDs) {
+        if (member.roles.indexOf(roleID) === -1) {
+          return false;
+        }
+      }
+    }
+
+    // Role names
+    if (options.requirements.roleNames.length > 0) {
+      console.log('Command needs role names');
+      const names = guild.roles.filter((role) => {
+        return member.roles.indexOf(role.id) !== -1;
+      }).map((role) => {
+        return role.name;
+      });
+
+      for(let name of options.requirements.roleNames) {
+        if(names.indexOf(name) === -1) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
 };
 
 /**
@@ -98,7 +168,7 @@ const info = async (msg) => {
     });
 
     guilds[i].roles.filter((role) => {
-      return member.roles.indexOf(role.id) > 0;
+      return member.roles.indexOf(role.id) !== -1;
     }).map((role) => {
       details += `\n• ${role.name}`
     });

@@ -43,7 +43,7 @@ module.exports = {
     try {
       return await Guild.determine(msg, async (guildId) => {
         return await Raffle.withdraw(guildId, msg.author.id);
-      });
+      }, options);
     }
     catch (error) {
       console.log(pe.render(error));

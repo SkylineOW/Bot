@@ -42,7 +42,7 @@ module.exports = {
     try {
       return await Guild.determine(msg, async (guildId) => {
         return await Raffle.issue(guildId, msg.author.id, args.join(' '));
-      });
+      }, options);
     }
     catch (error) {
       console.log(pe.render(error));

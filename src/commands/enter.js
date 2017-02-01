@@ -23,9 +23,7 @@ const options = {
   usage: ``,
   requirements: {
     userIDs: [],
-    permissions: {
-      'sendMessages': true,
-    },
+    permissions: {},
     roleIDs: [],
     roleNames: []
   },
@@ -44,7 +42,7 @@ module.exports = {
     try {
       return await Guild.determine(msg, async (guildId) => {
         return await Raffle.enter(guildId, msg.author);
-      });
+      }, options);
     }
     catch (error) {
       console.log(pe.render(error));

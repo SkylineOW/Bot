@@ -63,7 +63,7 @@ module.exports = {
     try {
       return await Guild.determine(msg, async (guildId) => {
         return await Raffle.draw(guildId, groups);
-      });
+      }, options);
     }
     catch(error) {
       console.log(pe.render(error));

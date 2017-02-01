@@ -26,6 +26,7 @@ const options = {
     userIDs: [],
     permissions: {
       'manageChannels': true,
+      'cookies': true,
     },
     roleIDs: [],
     roleNames: []
@@ -45,7 +46,7 @@ module.exports = {
     try {
       return await Guild.determine(msg, async (guildId) => {
         return await Raffle.info(guildId, msg.channel);
-      });
+      }, options);
     }
     catch (error) {
       console.log(pe.render(error));

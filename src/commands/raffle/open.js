@@ -49,7 +49,7 @@ module.exports = {
     try {
       return await Guild.determine(msg, async (guildId) => {
         return await Raffle.open(guildId, args[0]);
-      });
+      }, options);
     }
     catch (error) {
       console.log(pe.render(error));
