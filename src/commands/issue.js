@@ -15,7 +15,7 @@ const options = {
   deleteCommand: false,
   argsRequired: false,
   guildOnly: false,
-  dmOnly: true, // Command is intended for provate communication with the bot
+  dmOnly: true,
   description: `Inform the raffle managers that something is wrong with a message describing the issue.`,
   fullDescription: `\n**What:**\nIf you have some sort of issue with confirming to join a raffle, you can use this command to get in contact with a raffle manager. ` +
   `They will then assist you in solving any problems you have.\n` +

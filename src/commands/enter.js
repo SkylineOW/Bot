@@ -25,9 +25,7 @@ const options = {
     userIDs: [],
     permissions: {},
     roleIDs: [],
-    roleNames: [
-      '@everyone'
-    ]
+    roleNames: []
   },
   cooldown: 1000,
   cooldownMessage: 'Move too quickly, and you overlook much.',
