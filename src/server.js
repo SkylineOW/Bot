@@ -1,4 +1,8 @@
 /* eslint-disable no-console */
+
+// Add app monitoring
+require('newrelic');
+
 // Allow module importing from application root.
 process.env.NODE_PATH = __dirname;
 require('module').Module._initPaths();
