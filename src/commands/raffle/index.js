@@ -26,7 +26,6 @@ const options = {
     userIDs: [],
     permissions: {
       'manageChannels': true,
-      'cookies': true,
     },
     roleIDs: [],
     roleNames: []

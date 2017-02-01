@@ -1,9 +1,9 @@
 module.exports = {
   port: process.env.PORT || 3001,
-  prefix: process.env.BOT_PREFIX || '!',
+  prefix: process.env.BOT_PREFIX || '~',
 
   discord: {
-    token: process.env.DISCORD_TOKEN || 'discord_token',
+    token: process.env.DISCORD_TOKEN || 'MjY1NTI5NTI4MTI0ODMzODAy.C3OUAA.whk99DbdVoNAK8Htcv_l2eONEWE',
   },
 
   twitch: {
