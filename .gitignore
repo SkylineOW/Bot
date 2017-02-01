@@ -10,3 +10,4 @@ npm-debug.log
 npm-debug.log.*
 .idea
 
+newrelic_agent.log
