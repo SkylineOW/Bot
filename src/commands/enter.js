@@ -23,7 +23,9 @@ const options = {
   usage: ``,
   requirements: {
     userIDs: [],
-    permissions: {},
+    permissions: {
+      'sendMessages': true,
+    },
     roleIDs: [],
     roleNames: []
   },
