@@ -3,6 +3,8 @@
  */
 const pe = require('utils/error');
 
+const config = require('config');
+
 const Raffle = require('utils/raffle');
 
 const options = {
@@ -13,17 +15,22 @@ const options = {
   guildOnly: true,
   dmOnly: false,
   description: `Remove the channel from the list the raffle should announce in.`,
-  fullDescription: ``,
+  fullDescription: `\n**What:**\nRemove the channel this command is used in from the list of channels the raffle uses to broadcast results.\n` +
+  `\n**Inputs:**\nNo inputs. Adding inputs will result in the command being rejected.\n` +
+  `\n**Who:**\nAnyone that has the permission to manage channels can use this command.\n` +
+  `\n**Example:** \`${config.prefix}raffle remove\``,
   usage: ``,
   requirements: {
     userIDs: [],
-    permissions: {},
+    permissions: {
+      'manageChannels': true,
+    },
     roleIDs: [],
     roleNames: []
   },
   cooldown: 1000,
-  cooldownMessage: 'cooldown',
-  permissionMessage: 'permissions'
+  cooldownMessage: 'Move too quickly, and you overlook much.',
+  permissionMessage: 'Command cannot be used here or you do not have sufficient permissions.'
 };
 
 module.exports = {

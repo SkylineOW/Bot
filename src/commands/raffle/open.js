@@ -4,9 +4,10 @@
 
 const pe = require('utils/error');
 
+const config = require('config');
+
 const Guild = require('utils/guild');
 const Raffle = require('utils/raffle');
-const User = require('utils/user');
 
 const options = {
   aliases: [],
@@ -15,18 +16,23 @@ const options = {
   argsRequired: false,
   guildOnly: false,
   dmOnly: false,
-  description: `Reopen a closed raffle to allow more entries`,
-  fullDescription: ``,
-  usage: `\`mins\``,
+  description: `Reopen the raffle to allow more entries`,
+  fullDescription: `\n**What:**\nReopens the raffle for the specified number of minutes. If no time is specified, the raffle stays open indefinitely.\n` +
+  `\n**Inputs:**\n **time** - None or number of minutes the raffle will stay open.\nOther inputs will result in the command being rejected.\n` +
+  `\n**Who:**\nAnyone that has the permission to manage channels can use this command.\n` +
+  `\n**Examples:** \`${config.prefix}raffle open\` \`${config.prefix}raffle open 10\``,
+  usage: `\`time\``,
   requirements: {
     userIDs: [],
-    permissions: {},
+    permissions: {
+      'manageChannels': true,
+    },
     roleIDs: [],
     roleNames: []
   },
   cooldown: 1000,
-  cooldownMessage: 'cooldown',
-  permissionMessage: 'permissions'
+  cooldownMessage: 'Move too quickly, and you overlook much.',
+  permissionMessage: 'Command cannot be used here or you do not have sufficient permissions.'
 };
 
 const checkInput = (value) => {

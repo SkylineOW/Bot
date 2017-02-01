@@ -5,6 +5,8 @@
 const async = require('async');
 const pe = require('utils/error');
 
+const config = require('config');
+
 const Raffle = require('utils/raffle');
 const Guild = require('utils/guild');
 
@@ -13,20 +15,25 @@ const options = {
   caseInsensitive: false,
   deleteCommand: false,
   argsRequired: false,
-  guildOnly: false,
+  guildOnly: true, // Cannot mention people in dm's with the bot since the bot doesn't accept friend requests.
   dmOnly: false,
   description: `Add mentioned user to the list of raffle managers.`,
-  fullDescription: `Add mentioned users to the list of raffle managers.\nYou can mention yourself as well.\n to only add yourself, don't mention anyone.`,
-  usage: '\`mention mention ...\`',
+  fullDescription: `\n**What:**\nAdd mentioned users to the list of raffle managers (You can mention yourself as well to add yourself).\nTo only add yourself, don't mention anyone.\n` +
+  `\n**Inputs:**\n **mentions** - None or a list of mentioned people separated by spaces.\nOther inputs will result in the command being rejected.\n` +
+  `\n**Who:**\nAnyone that has the permission to manage channels can use this command.\n` +
+  `\n**Examples:** \`${config.prefix}raffle manage\` \`${config.prefix}raffle manage @John#1234 @Mary#0001\``,
+  usage: '\`mentions\`',
   requirements: {
     userIDs: [],
-    permissions: {},
+    permissions: {
+      'manageChannels': true,
+    },
     roleIDs: [],
     roleNames: [],
   },
   cooldown: 1000,
-  cooldownMessage: 'cooldown',
-  permissionMessage: 'permissions',
+  cooldownMessage: 'Move too quickly, and you overlook much.',
+  permissionMessage: 'Command cannot be used here or you do not have sufficient permissions.'
 };
 
 const checkInput = (value) => {

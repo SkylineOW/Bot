@@ -4,6 +4,8 @@
 
 const pe = require('utils/error');
 
+const config = require('config');
+
 const Guild = require('utils/guild');
 
 const options = {
@@ -14,8 +16,11 @@ const options = {
   guildOnly: false,
   dmOnly: true, // Dm only since this shows private information about user roles.
   description: `Fetch a list of all the guilds you and the bot share.`,
-  fullDescription: '', //ToDo: Fill in a proper description of the command.
-  usage: '',
+  fullDescription: '\n**What:**\nCreates a list of guilds you and the bot have in common.\n' +
+  `\n**Inputs:**\n **subcommand** - One or none of the subcommands listed below.\n\nOther inputs will result in the command being rejected.\n` +
+  `\n**Who:**\nAnyone can use this command.\n` +
+  `\n**Example:** \`${config.prefix}guilds\``,
+  usage: '\`subcommand\`',
   requirements: {
     userIDs: [],
     permissions: {},
@@ -23,8 +28,8 @@ const options = {
     roleNames: [],
   },
   cooldown: 1000,
-  cooldownMessage: 'cooldown',
-  permissionMessage: 'permissions',
+  cooldownMessage: 'Move too quickly, and you overlook much.',
+  permissionMessage: 'Command cannot be used here or you do not have sufficient permissions.'
 };
 
 module.exports = {

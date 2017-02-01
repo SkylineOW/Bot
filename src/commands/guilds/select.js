@@ -4,6 +4,8 @@
 
 const pe = require('utils/error');
 
+const config = require('config');
+
 const Guild = require('utils/guild');
 const User = require('utils/user');
 
@@ -14,8 +16,11 @@ const options = {
   argsRequired: true, // Guild number is required.
   guildOnly: false,
   dmOnly: true, // Dm only since this is irrelevant when using commands in a guild.
-  description: `Select a guild which all dm commands will be issued for.`,
-  fullDescription: '', //ToDo: Fill in a proper description of the command.
+  description: `Select a guild which all dm commands will be used for.`,
+  fullDescription: `\n**What:**\nCommand for selecting a guild for direct message in case you belong to more than one guild.\n` +
+  `\n**Inputs:**\n **number** - Number of the guild to choose from the list.\nOther inputs will result in the command being rejected.\n` +
+  `\n**Who:**\nAnyone can use this command.\n` +
+  `\n**Example:** \`${config.prefix}guilds select 2\``,
   usage: '\`number\`',
   requirements: {
     userIDs: [],
@@ -24,8 +29,8 @@ const options = {
     roleNames: [],
   },
   cooldown: 1000,
-  cooldownMessage: 'cooldown',
-  permissionMessage: 'permissions',
+  cooldownMessage: 'Move too quickly, and you overlook much.',
+  permissionMessage: 'Command cannot be used here or you do not have sufficient permissions.'
 };
 
 const checkInput = (value) => {

@@ -1,5 +1,5 @@
 /**
- * Command for closing a running raffle, preventing additional entries
+ * Command for entering into a running raffle
  */
 const pe = require('utils/error');
 
@@ -11,21 +11,19 @@ const Raffle = require('utils/raffle');
 const options = {
   aliases: [],
   caseInsensitive: false,
-  deleteCommand: false,
+  deleteCommand: true, // Delete this command to keep channels tidy.
   argsRequired: false,
   guildOnly: false,
-  dmOnly: false,
-  description: `Closes a running raffle to prevent addition entries.`,
-  fullDescription: `\n**What:**\nCommand the closes the raffle, preventing additional entries.\n` +
+  dmOnly: false, // Command can be used anywhere, but will output confirmation in raffle channels.
+  description: `Enter an ongoing raffle.`,
+  fullDescription: `\n**What:**\nIf you would like enter the raffle, use this command.\n` +
   `\n**Inputs:**\nNo inputs. Adding inputs will result in the command being rejected.\n` +
-  `\n**Who:**\nAnyone that has the permission to manage channels can use this command.\n` +
-  `\n**Example:** \`${config.prefix}close\``,
+  `\n**Who:**\nThis command is only valid when a raffle is ongoing and accepting entries.\n` +
+  `\n**Example:** \`${config.prefix}enter\``,
   usage: ``,
   requirements: {
     userIDs: [],
-    permissions: {
-      'manageChannels': true,
-    },
+    permissions: {},
     roleIDs: [],
     roleNames: []
   },
@@ -38,12 +36,12 @@ module.exports = {
   exec: async (msg, args) => {
     //Input validation
     if (args.length > 0) {
-      return `Invalid usage. Do \`!help raffle close\` to view proper usage.`;
+      return `Invalid usage. Do \`!help raffle enter\` to view proper usage.`;
     }
 
     try {
       return await Guild.determine(msg, async (guildId) => {
-        return await Raffle.close(guildId);
+        return await Raffle.enter(guildId, msg.author);
       });
     }
     catch (error) {
