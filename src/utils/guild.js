@@ -7,6 +7,7 @@ const User = require('utils/user');
  * Determine which guild a command is for
  * @param msg The command message
  * @param func A function that should be executed with the correct guildId
+ * @param options Options of the command in question
  * @returns {Promise.<String>}
  */
 const determine = async (msg, func, options) => {
@@ -64,10 +65,9 @@ const determine = async (msg, func, options) => {
  */
 const checkPermissions = (member, guild, options) => {
   if (options && options.requirements) {
-    console.log('Command needs permissions');
     // Permission check
     let keys = Object.keys(options.requirements.permissions);
-    if (keys.length > 0) {
+    if (keys.length) {
       let permissions = member.permission.json;
 
       for (let key of keys) {
@@ -79,7 +79,6 @@ const checkPermissions = (member, guild, options) => {
 
     // Role id's check
     if (options.requirements.roleIDs.length > 0) {
-      console.log('Command needs role IDs');
       for (let roleID of options.requirements.roleIDs) {
         if (member.roles.indexOf(roleID) === -1) {
           return false;
@@ -89,15 +88,14 @@ const checkPermissions = (member, guild, options) => {
 
     // Role names
     if (options.requirements.roleNames.length > 0) {
-      console.log('Command needs role names');
       const names = guild.roles.filter((role) => {
         return member.roles.indexOf(role.id) !== -1;
       }).map((role) => {
         return role.name;
       });
 
-      for(let name of options.requirements.roleNames) {
-        if(names.indexOf(name) === -1) {
+      for (let name of options.requirements.roleNames) {
+        if (names.indexOf(name) === -1) {
           return false;
         }
       }

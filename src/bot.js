@@ -96,41 +96,50 @@ bot.on('ready', () => {
   // Start an interval for starting monitoring tasks for various guilds.
   const startMonitoring = async () => {
     // Only start this if we have storage connections.
-    try {
+    if (redis.state === 'connected' && mongoose.state === 'open') {
+      const guilds = bot.guilds.map((guild) => {
+        return guild;
+      });
 
-      if (redis.state === 'connected' && mongoose.state === 'open') {
-        await async.each(bot.guilds.map((guild) => {
-          return guild;
-        }), async (guild) => {
-          // Fetch the status of the guild's raffle and the lock for it.
-          const response = await redis.multi()
+      await async.each(guilds, async (guild) => {
+        // Fetch the status of the guild's raffle and the lock for it.
+        const response = await new Promise((resolve) => {
+          redis.multi()
             .get(`Raffle:${guild.id}:state`)
             .ttl(`Raffle:${guild.id}:lock`)
-            .execAsync();
-
-          const status = response[0];
-          const guildTime = response[1];
-
-          const raffle = require('utils/raffle');
-
-          switch (status) {
-            case raffle.state.started:
-            case raffle.state.inProgress:
-            case raffle.state.closed:
-              if (guildTime <= 0) {
-                // Create a random number as a value to use in the lock.
-                const id = Math.random() * Date.now().valueOf();
-                await raffle.startMonitor(guild.id, id);
-              }
-              break;
-            default:
-              break;
-          }
+            .exec((error, result) => {
+            if(error) {
+              console.log(pe.render(error));
+              resolve(['Error', -1])
+            }
+            resolve(result);
+            });
         });
-      }
-    }
-    catch(error) {
-      console.log(pe.render(error));
+
+        const status = response[0];
+        const guildTime = response[1];
+
+        const raffle = require('utils/raffle');
+
+        switch (status) {
+          case raffle.state.started:
+          case raffle.state.inProgress:
+          case raffle.state.closed:
+            if (guildTime <= 0) {
+              console.log(`[Raffle] Started monitoring: ${guild.name}`);
+
+              // Create a random number as a value to use in the lock.
+              const id = Math.random() * Date.now().valueOf();
+              await raffle.startMonitor(guild.id, id);
+            }
+            break;
+          case 'Error':
+            console.log(`[Error] Could not fetch the guild state.\n${guild.name}`);
+            break;
+          default:
+            break;
+        }
+      });
     }
 
     setTimeout(startMonitoring, 10000);
@@ -190,10 +199,7 @@ const root = path.resolve(`${__dirname}/commands/`);
 const files = fs.readdirSync(root);
 
 Promise.all(files.map((file) => {
-  return new Promise(async (resolve) => {
-    await registerCommand(bot, root, file, file.slice(0, -3));
-    resolve();
-  });
+  return registerCommand(bot, root, file, file.slice(0, -3));
 })).then(() => {
   // Connect bot to discord.
   bot.connect();

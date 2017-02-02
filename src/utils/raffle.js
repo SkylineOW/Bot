@@ -1,5 +1,5 @@
 const async = require('async');
-const pe = new require('pretty-error')();
+const pe = require('utils/error');
 
 const bot = require('bot');
 const config = require('config');
@@ -106,13 +106,25 @@ const broadcastToChannels = async (guild, message) => {
  */
 const enter = async (guildId, user) => {
   //Get the raffle status.
-  let response = await redis.multi()
-    .get(`Raffle:${guildId}:state`)
-    .sismember(`Raffle:${guildId}:entries`, user.id)
-    .sismember(`Raffle:${guildId}:pending`, user.id)
-    .sismember(`Raffle:${guildId}:confirmed`, user.id)
-    .sismember(`Raffle:${guildId}:issues`, user.id)
-    .execAsync();
+  let response = await new Promise((resolve) => {
+    redis.multi()
+      .get(`Raffle:${guildId}:state`)
+      .sismember(`Raffle:${guildId}:entries`, user.id)
+      .sismember(`Raffle:${guildId}:pending`, user.id)
+      .hexists(`Raffle:${guildId}:confirmed`, user.id)
+      .sismember(`Raffle:${guildId}:issues`, user.id)
+      .exec((error, result) => {
+        if (error) {
+          console.log(pe.render(result));
+          resolve(null);
+        }
+        resolve(result);
+      });
+  });
+
+  if (!response) {
+    return `Something went wrong, please try again.`;
+  }
 
   const status = response[0];
   const inEntries = response[1];
@@ -125,7 +137,19 @@ const enter = async (guildId, user) => {
       // Make sure this user is not in any group of the raffle.
       if (!inEntries && !inPending && !inConfirmed && !inIssues) {
         // Add user to list of entries.
-        await redis.saddAsync(`Raffle:${guildId}:entries`, user.id);
+        const response = await new Promise((resolve) => {
+          redis.sadd(`Raffle:${guildId}:entries`, user.id, (error, result) => {
+            if (error) {
+              console.log(pe.render(error));
+              resolve(null);
+            }
+            resolve(result);
+          });
+        });
+
+        if (!response) {
+          return `Something went wrong, please try again.`;
+        }
 
         // Fetch the guild.
         let guild = await Guild.fetch(guildId);
@@ -157,12 +181,45 @@ const enter = async (guildId, user) => {
  * @param duration Time in minutes to open guild for
  * @returns {Promise.<String>}
  */
-const open = async (guildId, duration) => {
+const open = async (guildId, duration = 0) => {
   // Fetch the raffle state.
-  let status = await redis.getAsync(`Raffle:${guildId}:state`);
+  let response = await new Promise((resolve) => {
+    redis.get(`Raffle:${guildId}:state`, (error, result) => {
+      if (error) {
+        console.log(pe.render(error));
+        resolve('Error');
+      }
+      resolve(result);
+    });
+  });
 
-  switch (status) {
+  switch (response) {
     case state.closed:
+      // Set the timeout for the duration of the raffle.
+      const result = await new Promise((resolve) => {
+        const query = redis.multi();
+
+        query.set(`Raffle:${guildId}:state`, state.inProgress)
+          .set(`Raffle:${guildId}:timeout`, 'True')
+          .set(`Raffle:${guildId}:next`, state.closed);
+
+        if (duration) {
+          query.expire(`Raffle:${guildId}:timeout`, duration * 60);
+        }
+
+        query.exec((error, result) => {
+          if (error) {
+            console.log(pe.render(error));
+            resolve(null);
+          }
+          resolve(result);
+        });
+      });
+
+      if (!result) {
+        return `Something went wrong, please try again`;
+      }
+
       // Fetch the guild.
       let guild = await Guild.fetch(guildId);
 
@@ -181,26 +238,13 @@ const open = async (guildId, duration) => {
       // Inform all managers the raffle has closed.
       await broadcastToManagers(guild, `A raffle you manage has reopened.`);
 
-      // Set the timeout for the duration of the raffle.
-      if (duration) {
-        await redis.multi()
-          .set(`Raffle:${guildId}:state`, state.inProgress)
-          .set(`Raffle:${guildId}:timeout`, 'True')
-          .set(`Raffle:${guildId}:next`, state.closed)
-          .expire(`Raffle:${guildId}:timeout`, duration * 60)
-          .execAsync();
-      } else {
-        await redis.multi()
-          .set(`Raffle:${guildId}:state`, state.inProgress)
-          .set(`Raffle:${guildId}:timeout`, 'True')
-          .execAsync();
-      }
-
       break;
     case state.inProgress:
       return `The raffle is already open.`;
     case state.finished:
       return `The raffle has finished. Please use \`${config.prefix}raffle start\` instead to restart the raffle.`;
+    case 'Error':
+      return `Something went wrong, please try again`;
     default:
       return `Only closed raffles can be opened.`;
   }
@@ -213,10 +257,35 @@ const open = async (guildId, duration) => {
  */
 const close = async (guildId) => {
   // Fetch the raffle state.
-  let status = await redis.getAsync(`Raffle:${guildId}:state`);
+  let response = await new Promise((resolve) => {
+    redis.get(`Raffle:${guildId}:state`, (error, result) => {
+      if (error) {
+        console.log(pe.render(error));
+        resolve('Error');
+      }
+      resolve(result);
+    });
+  });
 
-  switch (status) {
+  switch (response) {
     case state.inProgress:
+      const result = await new Promise((resolve) => {
+        redis.multi()
+          .set(`Raffle:${guildId}:state`, state.closed)
+          .del(`Raffle:${guildId}:timeout`)
+          .exec((error, result) => {
+            if (error) {
+              console.log(error);
+              resolve(null);
+            }
+            resolve(result);
+          });
+      });
+
+      if (!result) {
+        return `Something went wrong, please try again.`;
+      }
+
       // Fetch the guild.
       let guild = await Guild.fetch(guildId);
 
@@ -235,16 +304,13 @@ const close = async (guildId) => {
       // Inform all managers the raffle has closed.
       await broadcastToManagers(guild, `A raffle you manage has closed.`);
 
-      await redis.multi()
-        .set(`Raffle:${guildId}:state`, state.closed)
-        .del(`Raffle:${guildId}:timeout`)
-        .execAsync();
-
       break;
     case state.created:
       return 'A raffle that has not started, cannot be closed.';
     case state.closed:
       return 'The raffle is already closed.';
+    case 'Error':
+      return `Something went wrong, please try again.`;
     default:
       return 'A raffle that is not running, cannot be closed.';
   }
@@ -263,10 +329,18 @@ const draw = async (guildId, groups = [6, 6]) => {
   }, 0);
 
   // Fetch the raffle state.
-  let response = await redis.multi()
-    .get(`Raffle:${guildId}:state`)
-    .scard(`Raffle:${guildId}:entries`)
-    .execAsync();
+  let response = await new Promise((resolve) => {
+    redis.multi()
+      .get(`Raffle:${guildId}:state`)
+      .scard(`Raffle:${guildId}:entries`)
+      .exec((error, result) => {
+        if (error) {
+          console.log(pe.render(error));
+          resolve(['Error', 0]);
+        }
+        resolve(result);
+      });
+  });
 
   const status = response[0];
   const entryCount = response[1];
@@ -285,13 +359,21 @@ const draw = async (guildId, groups = [6, 6]) => {
       }
 
       // Draw the total number of entries needed.
-      const response = await redis.multi()
-        .spop(`Raffle:${guildId}:entries`, total)
-        .execAsync();
+      const list = await new Promise((resolve) => {
+        redis.spop(`Raffle:${guildId}:entries`, total, (error, result) => {
+          if (error) {
+            console.log(pe.render(error));
+            resolve(null);
+          }
+          resolve(result);
+        });
+      });
 
-      const list = response[0];
+      if (!list) {
+        return `Something went wrong, please try again.`;
+      }
 
-      // Fetch a list of winners.
+      // Fetch the user objects of the winners
       const winners = list.map((userId) => {
         return bot.users.find((user) => {
           return userId === user.id;
@@ -299,9 +381,25 @@ const draw = async (guildId, groups = [6, 6]) => {
       });
 
       // Add all the winners to the pending list.
-      await redis.saddAsync(`Raffle:${guildId}:pending`, winners.map((user) => {
-        return user.id;
-      }));
+      const response = await new Promise((resolve) => {
+        redis.sadd(`Raffle:${guildId}:pending`, list, (error, result) => {
+          if (error) {
+            console.log(pe.render(error));
+            resolve(null);
+          }
+          resolve(result);
+        });
+      });
+
+      const mentions = winners.map((winner) => {
+        return winner.mention
+      }).join('\n');
+
+      if (!response) {
+        return `Something went wrong, but here is a list of winners:\n${winners.map((user) => {
+          return user.username;
+        }).join('\n')}`;
+      }
 
       // Start the pending process for the winners.
       await async.each(winners, async (user) => {
@@ -312,9 +410,7 @@ const draw = async (guildId, groups = [6, 6]) => {
         {
           name: `❯ Winners`,
           inline: true,
-          value: winners.map((user) => {
-            return user.mention;
-          }).join('\n'),
+          value: mentions,
         }
       ];
 
@@ -345,6 +441,7 @@ const draw = async (guildId, groups = [6, 6]) => {
         }
       });
 
+      // Send online managers the manage message and add them as active managers.
       await async.each(guild.raffle.managers, async (userId) => {
         const guild = bot.guilds.find((guild) => {
           return guildId === guild.id;
@@ -355,9 +452,7 @@ const draw = async (guildId, groups = [6, 6]) => {
         });
 
         if (member.status === 'online') {
-
           const channel = await bot.getDMChannel(userId);
-
           const message = await channel.createMessage({
             embed: {
               color: 6897122,
@@ -386,13 +481,24 @@ const draw = async (guildId, groups = [6, 6]) => {
             }
           });
 
-          await redis.multi()
-            .sadd(`Raffle:${guildId}:managers`, userId)
-            .set(`Raffle:${guildId}:m${userId}`, message.id)
-            .execAsync();
+          const response = await new Promise((resolve) => {
+            redis.hset(`Raffle:${guildId}:managers`, userId, message.id, (error, result) => {
+              if (error) {
+                console.log(pe.render(error));
+                resolve(null);
+              }
+              resolve(result);
+            });
+          });
+
+          if (!response) {
+            console.log(`[Error] Could not add manager to the list.\nGuild: ${guild.name}\nManger:${member.username}`);
+          }
         }
       });
       break;
+    case 'Error':
+      return `Something went wrong, please try again.`;
     default:
       return `There is no raffle running. Use \`${config.prefix}raffle start\` to start a new raffle.`;
   }
@@ -411,17 +517,23 @@ const informWinner = async (guildId, user) => {
     `\`${config.prefix}confirm JohnDoe#1234\` - I want to play!\n\n` +
     `\`${config.prefix}issue Insert message here\` - Something is wrong, I need an adult!\n\n` +
     `\`${config.prefix}withdraw\` - I changed my mind, maybe next time.\n\n` +
-    `Please reply in the next 2 minutes or you will withdraw automatically.`);
+    `Please reply in the next 10 minutes or you will withdraw automatically.`);
 
   // Start timeouts for all the users chosen.
   // ToDo: These timeouts should be able to reset if the bot dies.
-  setTimeout(async () => {
-    if (await redis.sismemberAsync(`Raffle:${guildId}:pending`, user.id) === 1) {
-      // Withdraw the user from the raffle.
-      await withdraw(guildId, user.id);
-      await channel.createMessage(`You have automatically withdrawn from the raffle due to inactivity.`);
-    }
-  }, 120 * 1000); // 2 min timeout.
+  setTimeout(() => {
+    redis.sismember(`Raffle:${guildId}:pending`, user.id, async (error, result) => {
+      if (error) {
+        console.log(pe.render(error));
+      }
+
+      if (result) {
+        // Withdraw the user from the raffle.
+        await withdraw(guildId, user.id);
+        await channel.createMessage(`You have automatically withdrawn from the raffle due to inactivity.`);
+      }
+    });
+  }, 600 * 1000); // 10 min timeout.
 };
 
 /**
@@ -434,6 +546,7 @@ const populate = async (guild) => {
     guild.populate('raffle', (error, result) => {
       if (error) {
         console.log(pe.render(error));
+        resolve(null);
       }
       resolve(result);
     });
@@ -465,9 +578,17 @@ const createOrPopulate = async (guild) => {
  * @param duration Time in minutes the raffle should be open
  * @returns {Promise.<String>}
  */
-const start = async (guildId, duration) => {
+const start = async (guildId, duration = 0) => {
   // Fetch the raffle state.
-  let status = await redis.getAsync(`Raffle:${guildId}:state`);
+  let status = await new Promise((resolve) => {
+    redis.get(`Raffle:${guildId}:state`, (error, result) => {
+      if (error) {
+        console.log(pe.render(error));
+        result('Error');
+      }
+      resolve(result);
+    });
+  });
 
   if (!status) {
     // No state, create one.
@@ -493,34 +614,177 @@ const start = async (guildId, duration) => {
         return `Please add at least one manager for the raffle to send issues to by using \`${config.prefix}raffle manage\``;
       }
 
-      // Broadcast to all channels that the raffle is starting.
-      await broadcastToChannels(guild, `The Funcast with Skyline raffle has started!\n` +
-        `Please use \`${config.prefix}enter\` to participate.`);
-
-      // Inform all managers the the raffle is starting.
-      await broadcastToManagers(guild, `A raffle you manage has started!`);
-
       // Set the timeout for the duration of the raffle to close it.
-      if (duration) {
-        await redis.multi()
+      const result = await new Promise((resolve) => {
+        redis.multi()
           .set(`Raffle:${guildId}:state`, state.inProgress)
           .set(`Raffle:${guildId}:timeout`, 'True')
           .set(`Raffle:${guildId}:next`, state.closed)
           .expire(`Raffle:${guildId}:timeout`, duration * 60)
-          .execAsync();
-      } else {
-        await redis.multi()
-          .set(`Raffle:${guildId}:state`, state.inProgress)
-          .set(`Raffle:${guildId}:timeout`, 'True')
-          .execAsync();
+          .exec((error, result) => {
+            if (error) {
+              console.log(pe.render(error));
+              resolve(null);
+            }
+            resolve(result);
+          });
+      });
+
+      if (!result) {
+        return `Something went wrong, please try again.`;
       }
+
+      // Broadcast to all channels that the raffle is starting.
+      await broadcastToChannels(guild, `The Funcast with Skyline raffle has started!\n` +
+        `Please use \`${config.prefix}enter\` to participate.`);
+
+      // Inform all managers the raffle is starting.
+      await broadcastToManagers(guild, `A raffle you manage has started!`);
+
       break;
     case state.inProgress:
       return 'The raffle is already in progress.';
     case state.closed:
       return `A closed raffle cannot be started. If you\'d like to extend the raffle, use \`${config.prefix}raffle open\` instead.`;
+    case 'Error':
+      return 'Something went wrong, please try again.';
     default:
       return 'The raffle is currently in progress. Please finish it before starting it again.';
+  }
+};
+
+/**
+ * Helper function for updating the raffle boxes in channels
+ * @param status Status of raffle
+ * @param channels Channels to update (Hash converted to array)
+ * @param entryCount Number of people that have entered the raffle
+ * @param remainingTime Time left until the raffle closes in seconds
+ * @returns {Promise.<void>}
+ */
+const updateChannels = async (status, channels, entryCount, remainingTime) => {
+  if (channels) {
+    await async.each(channels, async (entry) => {
+
+      const fields = [
+        {
+          name: '❯ Status',
+          value: status,
+          inline: true,
+        },
+        {
+          name: '❯ Entries',
+          value: entryCount,
+          inline: true,
+        }
+      ];
+
+      if (status === state.inProgress) {
+        fields.push({
+          name: '❯ Time remaining',
+          value: time.formatSeconds(remainingTime),
+          inline: true,
+        });
+      }
+
+      const channel = await bot.getChannel(entry.key);
+      await channel.editMessage(entry.value, {
+        embed: {
+          color: 6897122,
+          author: {
+            name: `Raffle`,
+          },
+          fields: fields
+        }
+      });
+    });
+  }
+};
+
+/**
+ * Helper function for updating the result boxes of managers.
+ * @param managers Managers to send updates to (Hash converted to array)
+ * @param Pending Array of pending entrant id's
+ * @param confirmations Array of confirmed entrants (Hash converted to array)
+ * @param Issues Array of id's for entrants with issues.
+ * @returns {Promise.<void>}
+ */
+const updateManagers = async (managers, Pending, confirmations, Issues) => {
+  if (managers && Pending && confirmations && Issues) {
+    const pending = Pending.map((userId) => {
+      return bot.users.find((user) => {
+        return user.id === userId;
+      }).username;
+    }).join('\n');
+
+    const confirmed = [];
+    await async.each(confirmations, async (confirmation) => {
+      const user = bot.users.find((user) => {
+        return confirmation.key === user.id;
+      });
+
+      confirmed.push(`${user.username}: ${confirmation.value}`);
+    });
+
+    const issues = Issues.map((userId) => {
+      return bot.users.find((user) => {
+        return user.id === userId;
+      }).username;
+    }).join('\n');
+
+    await async.each(managers, async (manager) => {
+      const channel = await bot.getDMChannel(manager.key);
+
+      const message = {
+        embed: {
+          color: 6897122,
+          author: {
+            name: `Entry Results`,
+          },
+          fields: [
+            {
+              name: `❯ Pending: ${Pending.length}`,
+              inline: true,
+              value: pending ? pending : 'None',
+            },
+            {
+              name: `❯ Issues: ${Issues.length}`,
+              inline: true,
+              value: issues ? issues : 'None',
+            },
+            {
+              name: `❯ Confirmed: ${confirmed.length}`,
+              inline: true,
+              value: confirmed.length ? confirmed.join('\n') : 'None',
+            }
+          ],
+        }
+      };
+
+      await channel.editMessage(manager.value, message);
+    });
+  }
+};
+
+/**
+ * Helper function for checking when the raffle should close.
+ * @param guildId ID of the raffle's guild
+ * @param status current status of the raffle
+ * @param remainingTime Time remaining before the raffle should close
+ * @param nextState The state to place the raffle in once the time runs out.
+ * @returns {Promise.<void>}
+ */
+const stateTimer = async (guildId, status, remainingTime, nextState) => {
+  if (status === state.inProgress) {
+    if (remainingTime <= -2) {
+      switch (nextState) {
+        case state.closed:
+          await close(guildId);
+          break;
+        default:
+          console.log(`Next state of raffle unclear.`);
+          break;
+      }
+    }
   }
 };
 
@@ -530,287 +794,76 @@ const start = async (guildId, duration) => {
  * @param id ID user for the lock to ensure only 1 valid timer
  * @returns {Promise.<void>}
  */
-const startMonitor = async (guildId, id) => {
-  try {
-    console.log(`Raffle monitoring started for ${guildId}`);
-
-    // Change the locks to match the id of this monitor session
-    await redis.multi()
-      .set(`Raffle:${guildId}:lock`, id)
-      .execAsync();
-
-    const updateChannels = async () => {
-      // Reset the lock on the channels loop
-      const response = await redis.multi()
-        .get(`Raffle:${guildId}:state`)
-        .get(`Raffle:${guildId}:channels:lock`)
-        .smembers(`Raffle:${guildId}:channels`)
-        .scard(`Raffle:${guildId}:entries`)
-        .ttl(`Raffle:${guildId}:timeout`)
-        .expire(`Raffle:${guildId}:channels:lock`, 6)
-        .execAsync();
-
-      const status = response[0];
-      const channelLock = response[1];
-      const channels = response[2];
-      const entryCount = response[3];
-      const raffleTimer = response[4];
-
-      let unlocked = channelLock === `${id}`;
-
-      if (!channelLock) {
-        await redis.setAsync(`Raffle:${guildId}:channels:lock`, id);
-        unlocked = true;
-      }
-
-      // Do update if we own the lock and there are channels to update.
-      if (channels) {
-        await async.each(channels, async (channelId) => {
-          const messageId = await redis.getAsync(`Raffle:${guildId}:c${channelId}`);
-
-          const fields = [
-            {
-              name: '❯ Status',
-              value: status,
-              inline: true,
-            },
-            {
-              name: '❯ Entries',
-              value: entryCount,
-              inline: true,
-            }
-          ];
-
-          if (status === state.inProgress) {
-            fields.push({
-              name: '❯ Time remaining',
-              value: time.formatSeconds(raffleTimer),
-              inline: true,
-            });
-          }
-
-          const channel = await bot.getChannel(channelId);
-          await channel.editMessage(messageId, {
-            embed: {
-              color: 6897122,
-              author: {
-                name: `Raffle`,
-              },
-              fields: fields
-            }
-          });
-        });
-      }
-
-      // Repeat if key and storage is good.
-      if (unlocked) {
-        switch (status) {
-          case state.inProgress:
-          case state.closed:
-            setTimeout(updateChannels, 3015);
-        }
-      }
-    };
-
-    const updateManagers = async () => {
-      // Reset the lock on the managers
-      const response = await redis.multi()
-        .get(`Raffle:${guildId}:state`)
-        .get(`Raffle:${guildId}:managers:lock`)
-        .smembers(`Raffle:${guildId}:managers`)
-        .smembers(`Raffle:${guildId}:pending`)
-        .smembers(`Raffle:${guildId}:confirmed`)
-        .smembers(`Raffle:${guildId}:issues`)
-        .expire(`Raffle:${guildId}:managers:lock`, 6)
-        .execAsync();
-
-      const status = response[0];
-      const managerLock = response[1];
-      const managers = response[2];
-      const Pending = response[3];
-      const Confirmed = response[4];
-      const Issues = response[5];
-
-      let unlocked = managerLock === `${id}`;
-
-      if (!managerLock) {
-        await redis.setAsync(`Raffle:${guildId}:managers:lock`, id);
-        unlocked = true;
-      }
-
-      //Do update for every listed manager
-      if (managers && Pending && Confirmed && Issues) {
-        const pending = Pending.map((userId) => {
-          return bot.users.find((user) => {
-            return user.id === userId;
-          }).username;
-        }).join('\n');
-
-        const confirmed = [];
-        await async.each(Confirmed, async (userId) => {
-          const battleTag = await redis.getAsync(`Raffle:${guildId}:confirmed:${userId}`);
-          const user = bot.users.find((user) => {
-            return userId === user.id;
-          });
-
-          confirmed.push(`${user.username}: ${battleTag}`);
-        });
-
-        const issues = Issues.map((userId) => {
-          return bot.users.find((user) => {
-            return user.id === userId;
-          }).username;
-        }).join('\n');
-
-        await async.each(managers, async (userId) => {
-          const channel = await bot.getDMChannel(userId);
-          const messageId = await redis.getAsync(`Raffle:${guildId}:m${userId}`);
-
-          const message = {
-            embed: {
-              color: 6897122,
-              author: {
-                name: `Entry Results`,
-              },
-              fields: [
-                {
-                  name: `❯ Pending: ${Pending.length}`,
-                  inline: true,
-                  value: pending ? pending : 'None',
-                },
-                {
-                  name: `❯ Issues: ${Issues.length}`,
-                  inline: true,
-                  value: issues ? issues : 'None',
-                },
-                {
-                  name: `❯ Confirmed: ${Confirmed.length}`,
-                  inline: true,
-                  value: confirmed.length ? confirmed.join('\n') : 'None',
-                }
-              ],
-            }
-          };
-
-          await channel.editMessage(messageId, message);
-        });
-      }
-
-      // Repeat if key and storage is good.
-      if (unlocked) {
-        switch (status) {
-          case state.inProgress:
-          case state.closed:
-            setTimeout(updateManagers, 3020);
-            break;
-        }
-      }
-    };
-
-    const stateTimer = async () => {
-      // Start an interval that monitors the timeout ttl and closes the raffle when it doesn't exist anymore.
-      // ToDo: Allow timer end event type to be set for auto draw on timer finish.
-      const response = await redis.multi()
-        .get(`Raffle:${guildId}:state`)
-        .get(`Raffle:${guildId}:timeout:lock`)
-        .get(`Raffle:${guildId}:next`)
-        .ttl(`Raffle:${guildId}:timeout`)
-
-        .expire(`Raffle:${guildId}:timeout:lock`, 13)
-        .execAsync();
-
-      const status = response[0];
-      const timerLock = response[1];
-      const nextState = response[2];
-      const raffleTimer = response[3];
-
-      let unlocked = timerLock === `${id}`;
-
-      if (!timerLock) {
-        await redis.setAsync(`Raffle:${guildId}:timeout:lock`, id);
-        unlocked = true;
-      }
-
-      if (status === state.inProgress) {
-        if (raffleTimer <= -2) {
-          switch (nextState) {
-            case state.closed:
-              await close(guildId);
-              break;
-            default:
-              console.log(`Next state of raffle unclear.`);
-              break;
-          }
-        }
-      }
-
-      if (unlocked && status === state.inProgress) {
-        setTimeout(stateTimer, 10 * 1000);
-      }
-    };
+const startMonitor = (guildId, id) => {
+  // Change the locks to match the id of this monitor session
+  redis.set(`Raffle:${guildId}:lock`, id, async (error) => {
+    if (error) {
+      console.log(pe.render(error));
+      return null;
+    }
 
     const monitor = async () => {
-      // Place a lock on the raffle
-      const response = await redis.multi()
-        .get(`Raffle:${guildId}:state`)
-        .get(`Raffle:${guildId}:lock`)
-        .ttl(`Raffle:${guildId}:channels:lock`)
-        .ttl(`Raffle:${guildId}:managers:lock`)
-        .ttl(`Raffle:${guildId}:timeout:lock`)
-        .expire(`Raffle:${guildId}:lock`, 7)
-        .execAsync();
+      // Fetch all the data needed for an update.
+      const response = await new Promise((resolve) => {
+        redis.multi()
+          .get(`Raffle:${guildId}:state`)
+          .get(`Raffle:${guildId}:lock`)
+          .hgetall(`Raffle:${guildId}:channels`)
+          .scard(`Raffle:${guildId}:entries`)
+          .ttl(`Raffle:${guildId}:timeout`)
+          .hgetall(`Raffle:${guildId}:managers`)
+          .smembers(`Raffle:${guildId}:pending`)
+          .hgetall(`Raffle:${guildId}:confirmed`)
+          .smembers(`Raffle:${guildId}:issues`)
+          .get(`Raffle:${guildId}:next`)
+          .expire(`Raffle:${guildId}:lock`, 5)
+          .exec((error, result) => {
+            if (error) {
+              console.log(pe.render(error));
+              resolve(null);
+            }
+            resolve(result);
+          });
+      });
+
+      if (!response) {
+        console.log(`[Error] Could not retrieve update information:\nGuild: ${guildId}`);
+        return null;
+      }
 
       const status = response[0];
       const guildLock = response[1];
-      const channelLock = response[2];
-      const managerLock = response[3];
-      const timerLock = response[4];
-
-      const unlocked = guildLock === `${id}`;
+      const channels = hashToArray(response[2]);
+      const entryCount = response[3];
+      const remainingTime = response[4];
+      const managers = hashToArray(response[5]);
+      const pending = response[6];
+      const confirmations = hashToArray(response[7]);
+      const issues = response[8];
+      const nextState = response[9];
 
       switch (status) {
         case state.inProgress:
-          // Check if there is a lock present on the channels
-          if (channelLock <= 0) {
-            await updateChannels();
-          }
-
-          // Check if there is a lock present on the manager messages
-          if (managerLock <= 0) {
-            await updateManagers();
-          }
-
-          // Check if there is a timer running for closing the raffle after a time period
-          if (timerLock <= 0) {
-            await stateTimer();
-          }
+          await updateChannels(status, channels, entryCount, remainingTime);
+          await updateManagers(managers, pending, confirmations, issues);
+          await stateTimer(guildId, status, remainingTime, nextState);
           break;
         case state.closed:
-          // Check if there is a lock present on the channels
-          if (channelLock <= 0) {
-            await updateChannels();
-          }
-
-          // Check if there is a lock present on the manager messages
-          if (managerLock <= 0) {
-            await updateManagers();
-          }
+          await updateChannels(status, channels, entryCount, remainingTime);
+          await updateManagers(managers, pending, confirmations, issues);
           break;
         default:
           break;
       }
 
-      // Repeat if key and storage is good.
-      if (unlocked) {
-        setTimeout(monitor, 5000);
+      // Repeat if lock is good.
+      if (guildLock === `${id}`) {
+        setTimeout(monitor, 3000);
       }
     };
 
     await monitor();
-  }
-  catch (error) {
-    console.log(pe.render(error));
-  }
+  });
 };
 
 /**
@@ -820,11 +873,42 @@ const startMonitor = async (guildId, id) => {
  */
 const finish = async (guildId) => {
   // Fetch the raffle state.
-  let status = await redis.getAsync(`Raffle:${guildId}:state`);
+  let status = await new Promise((resolve) => {
+    redis.get(`Raffle:${guildId}:state`, (error, result) => {
+      if (error) {
+        console.log(pe.render(error));
+        resolve('Error');
+      }
+      resolve(result);
+    });
+  });
 
   switch (status) {
     case state.inProgress:
     case state.closed:
+      const response = await new Promise((resolve) => {
+        redis.multi()
+          .del(`Raffle:${guildId}:state`)
+          .del(`Raffle:${guildId}:next`)
+          .del(`Raffle:${guildId}:timeout`)
+          .del(`Raffle:${guildId}:entries`)
+          .del(`Raffle:${guildId}:pending`)
+          .del(`Raffle:${guildId}:confirmed`)
+          .del(`Raffle:${guildId}:channels`)
+          .del(`Raffle:${guildId}:managers`)
+          .exec((error, result) => {
+            if (error) {
+              console.log(pe.render(error));
+              resolve(null);
+            }
+            resolve(result);
+          });
+      });
+
+      if (!response) {
+        console.log(`[Error] Could not clean up raffle.\nGuild: ${guildId}`);
+      }
+
       // Fetch the guild with the provided id.
       let guild = await Guild.fetchOrCreate(guildId);
 
@@ -837,47 +921,9 @@ const finish = async (guildId) => {
       // Inform all managers the the raffle is starting.
       await broadcastToManagers(guild, `A raffle you manage has finished.`);
 
-      const response = await redis.multi()
-        .smembers(`Raffle:${guildId}:confirmed`) //need to cleanup the confirmed
-        .smembers(`Raffle:${guildId}:issues`) //need to cleanup the issues
-        .smembers(`Raffle:${guildId}:channels`)
-        .smembers(`Raffle:${guildId}:managers`)
-        .del(`Raffle:${guildId}:state`)
-        .del(`Raffle:${guildId}:next`)
-        .del(`Raffle:${guildId}:timeout`)
-        .del(`Raffle:${guildId}:entries`)
-        .del(`Raffle:${guildId}:pending`)
-        .execAsync();
-
-      const confirmed = response[0];
-      const issues = response[1];
-      const channels = response[2];
-      const managers = response[3];
-
-      // ToDo: This should all be replace with hashes.
-      await async.each(confirmed, async (userId) => {
-        await redis.delAsync(`Raffle:${guildId}:confirmed:${userId}`);
-      });
-
-      await async.each(issues, async (userId) => {
-        await redis.delAsync(`Raffle:${guildId}:issues:${userId}`);
-      });
-
-      await async.each(channels, async (channelId) => {
-        await redis.delAsync(`Raffle:${guildId}:c${channelId}`);
-      });
-
-      await async.each(managers, async (userId) => {
-        await redis.delAsync(`Raffle:${guildId}:m${userId}`);
-      });
-
-      await redis.multi()
-        .del(`Raffle:${guildId}:confirmed`)
-        .del(`Raffle:${guildId}:issues`)
-        .del(`Raffle:${guildId}:channels`)
-        .del(`Raffle:${guildId}:managers`)
-        .execAsync();
       break;
+    case 'Error':
+      return `Something went wrong, please try again.`;
     default:
       return `The raffle is already finished.`;
   }
@@ -891,37 +937,54 @@ const finish = async (guildId) => {
  */
 const info = async (guildId, channel) => {
   // Fetch the raffle state.
-  let status = await redis.multi()
-    .get(`Raffle:${guildId}:state`)
-    .scard(`Raffle:${guildId}:entries`)
-    .ttl(`Raffle:${guildId}:timeout`)
-    .get(`Raffle:${guildId}:c${channel.id}`)
-    .execAsync();
+  const response = await new Promise((resolve) => {
+    redis.multi()
+      .get(`Raffle:${guildId}:state`)
+      .scard(`Raffle:${guildId}:entries`)
+      .ttl(`Raffle:${guildId}:timeout`)
+      .hget(`Raffle:${guildId}:channels`, channel.id)
+      .exec((error, result) => {
+        if (error) {
+          console.log(pe.render(error));
+          resolve(null);
+        }
+        resolve(result);
+      });
+  });
 
-  switch (status[0]) {
+  if (!response) {
+    return `Something went wrong, please try again.`;
+  }
+
+  const status = response[0];
+  const entryCount = response[1];
+  const remainingTime = response[2];
+  const lastMessageId = response[3];
+
+  switch (status) {
     case state.inProgress:
     case state.closed:
-      if (status[3]) {
-        await channel.deleteMessage([status[3]]);
+      if (lastMessageId) {
+        await channel.deleteMessage(lastMessageId);
       }
 
       const fields = [
         {
           name: '❯ Status',
-          value: status[0],
+          value: status,
           inline: true,
         },
         {
           name: '❯ Entries',
-          value: status[1],
+          value: entryCount,
           inline: true,
         }
       ];
 
-      if (status[0] === state.inProgress) {
+      if (status === state.inProgress) {
         fields.push({
           name: '❯ Time remaining',
-          value: time.formatSeconds(status[2]),
+          value: time.formatSeconds(remainingTime),
           inline: true,
         });
       }
@@ -936,10 +999,19 @@ const info = async (guildId, channel) => {
         }
       });
 
-      await redis.multi()
-        .sadd(`Raffle:${guildId}:channels`, channel.id)
-        .set(`Raffle:${guildId}:c${channel.id}`, message.id)
-        .execAsync();
+      const response = await new Promise((resolve) => {
+        redis.hset(`Raffle:${guildId}:channels`, channel.id, message.id, (error, result) => {
+          if (error) {
+            console.log(pe.render(error));
+            resolve(null);
+          }
+          resolve(result);
+        });
+      });
+
+      if (!response) {
+        console.log(`[Error] Could not set the raffle message.\nGuild: ${guildId}\nChannel: ${channel.name}`);
+      }
       break;
     default:
       return `There's no raffle running at this moment.`;
@@ -954,11 +1026,23 @@ const info = async (guildId, channel) => {
  * @returns {Promise.<String>}
  */
 const issue = async (guildId, userId, message) => {
-  const response = await redis.multi()
-    .get(`Raffle:${guildId}:state`)
-    .sismember(`Raffle:${guildId}:pending`, userId)
-    .sismember(`Raffle:${guildId}:confirmed`, userId)
-    .execAsync();
+  const response = await new Promise((resolve) => {
+    redis.multi()
+      .get(`Raffle:${guildId}:state`)
+      .sismember(`Raffle:${guildId}:pending`, userId)
+      .hexists(`Raffle:${guildId}:confirmed`, userId)
+      .exec((error, result) => {
+        if (error) {
+          console.log(pe.render(error));
+          resolve(null);
+        }
+        resolve(result);
+      });
+  });
+
+  if (!response) {
+    return `Something went wrong, please try again.`;
+  }
 
   const status = response[0];
   const inPending = response[1];
@@ -969,13 +1053,24 @@ const issue = async (guildId, userId, message) => {
     case state.closed:
       // Check if the person is in the right groups
       if (inPending || inConfirmed) {
-        const response = await redis.multi()
-          .smembers(`Raffle:${guildId}:managers`)
-          .srem(`Raffle:${guildId}:pending`, userId)
-          .srem(`Raffle:${guildId}:confirmed`, userId)
-          .del(`Raffle:${guildId}:confirmed:${userId}`)
-          .sadd(`Raffle:${guildId}:issues`, userId)
-          .execAsync();
+        const response = await new Promise((resolve) => {
+          redis.multi()
+            .hkeys(`Raffle:${guildId}:managers`)
+            .srem(`Raffle:${guildId}:pending`, userId)
+            .hdel(`Raffle:${guildId}:confirmed`, userId)
+            .sadd(`Raffle:${guildId}:issues`, userId)
+            .exec((error, result) => {
+              if (error) {
+                console.log(pe.render(error));
+                resolve(null);
+              }
+              resolve(result);
+            });
+        });
+
+        if (!response) {
+          return `Something went wrong, please try again`;
+        }
 
         const managers = response[0];
 
@@ -988,18 +1083,15 @@ const issue = async (guildId, userId, message) => {
           const channel = await bot.getDMChannel(managerId);
           await channel.createMessage({
             embed: {
+              title: `${user.mention} has an issue:`,
+              description: message,
               color: 6897122,
-              fields: [
-                {
-                  name: `Issue by ${user.username}`,
-                  value: message
-                }
-              ]
             }
           });
         });
 
-        return `Issue has been sent. Expect a message from a manager soon.`;
+        return `Issue has been sent.\n` +
+          `Expect a message from a mod soon.`;
       }
 
       return `Only chosen players can use this command.\n` +
@@ -1018,11 +1110,23 @@ const issue = async (guildId, userId, message) => {
  */
 const confirm = async (guildId, userId, battleTag) => {
   //Check pending for the userId,
-  const response = await redis.multi()
-    .get(`Raffle:${guildId}:state`)
-    .sismember(`Raffle:${guildId}:pending`, userId)
-    .sismember(`Raffle:${guildId}:issues`, userId)
-    .execAsync();
+  const response = await new Promise((resolve) => {
+    redis.multi()
+      .get(`Raffle:${guildId}:state`)
+      .sismember(`Raffle:${guildId}:pending`, userId)
+      .sismember(`Raffle:${guildId}:issues`, userId)
+      .exec((error, result) => {
+        if (error) {
+          console.log(pe.render(error));
+          resolve(null);
+        }
+        resolve(result);
+      });
+  });
+
+  if (!response) {
+    return `Something went wrong, please try again.`;
+  }
 
   const status = response[0];
   const inPending = response[1];
@@ -1033,15 +1137,28 @@ const confirm = async (guildId, userId, battleTag) => {
     case state.closed:
       // Check if the person is in the pending or issues groups
       if (inPending || inIssues) {
-        await redis.multi()
-          .srem(`Raffle:${guildId}:pending`, userId)
-          .srem(`Raffle:${guildId}:issues`, userId)
-          .del(`Raffle:${guildId}:issues:${userId}`)
-          .sadd(`Raffle:${guildId}:confirmed`, userId)
-          .set(`Raffle:${guildId}:confirmed:${userId}`, battleTag)
-          .execAsync();
+        const response = await new Promise((resolve) => {
+          redis.multi()
+            .srem(`Raffle:${guildId}:pending`, userId)
+            .srem(`Raffle:${guildId}:issues`, userId)
+            .del(`Raffle:${guildId}:issues:${userId}`)
+            .hset(`Raffle:${guildId}:confirmed`, userId, battleTag)
+            .exec((error, result) => {
+              if (error) {
+                console.log(pe.render(error));
+                resolve(null);
+              }
+              resolve(result);
+            });
+        });
 
-        return `Confirmation complete, keep an eye on your friend requests in Overwatch.\n\n` +
+        if (!response) {
+          return `Something went wrong, please confirm again.`;
+        }
+
+        return `Confirmation complete.\n\n` +
+          `**Please make sure you have Overwatch running on the correct region.**\n` +
+          `**A mod will send you a custom game invite shortly.**\n\n` +
           `Enjoy the games!`;
       }
 
@@ -1059,12 +1176,24 @@ const confirm = async (guildId, userId, battleTag) => {
  * @returns {Promise.<String>}
  */
 const withdraw = async (guildId, userId) => {
-  const response = await redis.multi()
-    .get(`Raffle:${guildId}:state`)
-    .sismember(`Raffle:${guildId}:pending`, userId)
-    .sismember(`Raffle:${guildId}:issues`, userId)
-    .sismember(`Raffle:${guildId}:confirmed`, userId)
-    .execAsync();
+  const response = await new Promise((resolve) => {
+    redis.multi()
+      .get(`Raffle:${guildId}:state`)
+      .sismember(`Raffle:${guildId}:pending`, userId)
+      .sismember(`Raffle:${guildId}:issues`, userId)
+      .hexists(`Raffle:${guildId}:confirmed`, userId)
+      .exec((error, result) => {
+        if (error) {
+          console.log(pe.render(error));
+          resolve(null)
+        }
+        resolve(result);
+      });
+  });
+
+  if (!response) {
+    return `Something went wrong, please try again.`;
+  }
 
   const status = response[0];
   const inPending = response[1];
@@ -1076,13 +1205,24 @@ const withdraw = async (guildId, userId) => {
     case state.closed:
       // Remove the user from the list he is in.
       if (inPending || inIssues || inConfirmed) {
-        await redis.multi()
-          .srem(`Raffle:${guildId}:pending`, userId)
-          .srem(`Raffle:${guildId}:issues`, userId)
-          .del(`Raffle:${guildId}:issues:${userId}`)
-          .srem(`Raffle:${guildId}:confirmed`, userId)
-          .del(`Raffle:${guildId}:confirmed:${userId}`)
-          .execAsync();
+        const result = await new Promise((resolve) => {
+          redis.multi()
+            .srem(`Raffle:${guildId}:pending`, userId)
+            .srem(`Raffle:${guildId}:issues`, userId)
+            .del(`Raffle:${guildId}:issues:${userId}`)
+            .hdel(`Raffle:${guildId}:confirmed`, userId)
+            .exec((error, result) => {
+              if (error) {
+                console.log(pe.render(error));
+                resolve(null);
+              }
+              resolve(result);
+            });
+        });
+
+        if (!result) {
+          return `Could not withdraw from the raffle at this time, please try again.`;
+        }
 
         return `You have withdrawn from the raffle. Join us again next time!`;
       }
@@ -1140,6 +1280,7 @@ const removeManagers = async (guildId, users) => {
     return 'Something went wrong, please try again.';
   }
 
+  // Populate raffle
   guild = await populate(guild);
 
   const results = [];
@@ -1170,6 +1311,26 @@ const broadcastToManagers = async (guild, message) => {
     const channel = await bot.getDMChannel(managerId);
     await channel.createMessage(message);
   });
+};
+
+const hashToArray = (hash) => {
+  const result = [];
+
+  if (!hash) {
+    return result;
+  }
+
+  let keys = Object.keys(hash);
+  if (keys.length) {
+    for (let key of keys) {
+      result.push({
+        key,
+        value: hash[key],
+      });
+    }
+  }
+
+  return result;
 };
 
 module.exports = {
