@@ -616,18 +616,23 @@ const start = async (guildId, duration = 0) => {
 
       // Set the timeout for the duration of the raffle to close it.
       const result = await new Promise((resolve) => {
-        redis.multi()
-          .set(`Raffle:${guildId}:state`, state.inProgress)
-          .set(`Raffle:${guildId}:timeout`, 'True')
-          .set(`Raffle:${guildId}:next`, state.closed)
-          .expire(`Raffle:${guildId}:timeout`, duration * 60)
-          .exec((error, result) => {
-            if (error) {
-              console.log(pe.render(error));
-              resolve(null);
-            }
-            resolve(result);
-          });
+        const query = redis.multi();
+
+        query.set(`Raffle:${guildId}:state`, state.inProgress)
+        .set(`Raffle:${guildId}:timeout`, 'True')
+        .set(`Raffle:${guildId}:next`, state.closed);
+
+        if(duration) {
+          query.expire(`Raffle:${guildId}:timeout`, duration * 60);
+        }
+
+        query.exec((error, result) => {
+          if (error) {
+            console.log(pe.render(error));
+            resolve(null);
+          }
+          resolve(result);
+        });
       });
 
       if (!result) {

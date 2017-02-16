@@ -148,7 +148,7 @@ bot.on('ready', () => {
   setTimeout(startMonitoring, 3000);
 });
 
-//Needs to happen before commands are registered since some of them rely on this file.
+// Needs to happen before commands are registered since some of them rely on this file.
 module.exports = bot;
 
 // Helper function for registering commands.
