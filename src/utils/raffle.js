@@ -921,6 +921,7 @@ const finish = async (guildId) => {
           .del(`Raffle:${guildId}:confirmed`)
           .del(`Raffle:${guildId}:channels`)
           .del(`Raffle:${guildId}:managers`)
+          .del(`Raffle:${guildId}:issues`)
           .exec((error, result) => {
             if (error) {
               console.log(pe.render(error));
