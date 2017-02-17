@@ -45,7 +45,7 @@ const addChannel = async (channel) => {
     return 'The raffle already uses this channel.';
   }
 
-  await Raffle.findByIdAndUpdate(guild.raffle._id, {$push: {channels: channelId}}, {new: true, safe: true});
+  await Raffle.findByIdAndUpdate(guild.raffle._id, { $push: { channels: channelId } }, { new: true, safe: true });
   return 'The raffle now uses this channel.';
 };
 
@@ -81,7 +81,7 @@ const removeChannel = async (channel) => {
     return `The raffle needs at least one channel to post results in.\nPlease add another channel with \`${config.prefix}raffle add\` before removing this one.`;
   }
 
-  await Raffle.findByIdAndUpdate(guild.raffle.id, {$pull: {channels: channelId}}, {new: true, safe: true});
+  await Raffle.findByIdAndUpdate(guild.raffle.id, { $pull: { channels: channelId } }, { new: true, safe: true });
   return `The raffle no longer uses this channel.`;
 };
 
@@ -402,8 +402,9 @@ const draw = async (guildId, groups = [6, 6]) => {
       }
 
       // Start the pending process for the winners.
-      await async.each(winners, async (user) => {
+      await async.each(winners, async (user, callback) => {
         await informWinner(guildId, user);
+        callback();
       });
 
       let fields = [
@@ -442,7 +443,7 @@ const draw = async (guildId, groups = [6, 6]) => {
       });
 
       // Send online managers the manage message and add them as active managers.
-      await async.each(guild.raffle.managers, async (userId) => {
+      await async.each(guild.raffle.managers, async (userId, callback) => {
         const guild = bot.guilds.find((guild) => {
           return guildId === guild.id;
         });
@@ -495,6 +496,8 @@ const draw = async (guildId, groups = [6, 6]) => {
             console.log(`[Error] Could not add manager to the list.\nGuild: ${guild.name}\nManger:${member.username}`);
           }
         }
+
+        callback();
       });
       break;
     case 'Error':
@@ -512,12 +515,14 @@ const draw = async (guildId, groups = [6, 6]) => {
  */
 const informWinner = async (guildId, user) => {
   const channel = await user.getDMChannel();
-  await channel.createMessage(`Congratulations!\nYou've been chosen as a winner for the raffle.\n` +
+  const message = await bot.createMessage(channel.id, `Congratulations!\nYou've been chosen as a winner for the raffle.\n` +
     `Please reply with one of the following commands:\n\n` +
-    `\`${config.prefix}confirm JohnDoe#1234\` - I want to play!\n\n` +
+    `\`${config.prefix}confirm Battletag#1234\` - I want to play!\n\n` +
     `\`${config.prefix}issue Insert message here\` - Something is wrong, I need an adult!\n\n` +
     `\`${config.prefix}withdraw\` - I changed my mind, maybe next time.\n\n` +
     `Please reply in the next 10 minutes or you will withdraw automatically.`);
+
+  console.log(`[Info] DM Message sent to use for raffle entry\nGuild: ${guildId}\nUser:${user.id}\nMessage:${message.id}`);
 
   // Start timeouts for all the users chosen.
   // ToDo: These timeouts should be able to reset if the bot dies.
@@ -619,10 +624,10 @@ const start = async (guildId, duration = 0) => {
         const query = redis.multi();
 
         query.set(`Raffle:${guildId}:state`, state.inProgress)
-        .set(`Raffle:${guildId}:timeout`, 'True')
-        .set(`Raffle:${guildId}:next`, state.closed);
+          .set(`Raffle:${guildId}:timeout`, 'True')
+          .set(`Raffle:${guildId}:next`, state.closed);
 
-        if(duration) {
+        if (duration) {
           query.expire(`Raffle:${guildId}:timeout`, duration * 60);
         }
 
@@ -715,26 +720,41 @@ const updateChannels = async (status, channels, entryCount, remainingTime) => {
  */
 const updateManagers = async (managers, Pending, confirmations, Issues) => {
   if (managers && Pending && confirmations && Issues) {
-    const pending = Pending.map((userId) => {
-      return bot.users.find((user) => {
+    let pending = [];
+    Pending.map((userId) => {
+      const user = bot.users.find((user) => {
         return user.id === userId;
-      }).username;
-    }).join('\n');
+      });
+
+      if(user && user.username) {
+        pending.push(user.username);
+      }
+    });
+    pending = pending.join('\n');
 
     const confirmed = [];
-    await async.each(confirmations, async (confirmation) => {
+    await async.eachSeries(confirmations, async (confirmation, callback) => {
       const user = bot.users.find((user) => {
         return confirmation.key === user.id;
       });
 
-      confirmed.push(`${user.username}: ${confirmation.value}`);
+      if (user) {
+        confirmed.push(`${user.username}: ${confirmation.value}`);
+      }
+      callback();
     });
 
-    const issues = Issues.map((userId) => {
-      return bot.users.find((user) => {
-        return user.id === userId;
-      }).username;
-    }).join('\n');
+    let issues = [];
+    Issues.map((userId) => {
+      const user = bot.users.find((user) => {
+        return userId === user.id;
+      });
+
+      if (user && user.username) {
+        issues.push(user.username);
+      }
+    });
+    issues = issues.join('\n');
 
     await async.each(managers, async (manager) => {
       const channel = await bot.getDMChannel(manager.key);
@@ -1264,7 +1284,10 @@ const addManagers = async (guildId, users) => {
     }
   });
 
-  await Raffle.findByIdAndUpdate(guild.raffle._id, {$push: {managers: {$each: additions}}}, {new: true, safe: true});
+  await Raffle.findByIdAndUpdate(guild.raffle._id, { $push: { managers: { $each: additions } } }, {
+    new: true,
+    safe: true
+  });
 
   return results.join('\n');
 };
@@ -1300,7 +1323,10 @@ const removeManagers = async (guildId, users) => {
     }
   });
 
-  await Raffle.findByIdAndUpdate(guild.raffle._id, {$pull: {managers: {$in: removals}}}, {new: true, safe: true});
+  await Raffle.findByIdAndUpdate(guild.raffle._id, { $pull: { managers: { $in: removals } } }, {
+    new: true,
+    safe: true
+  });
 
   return results.join('\n');
 };
@@ -1321,17 +1347,15 @@ const broadcastToManagers = async (guild, message) => {
 const hashToArray = (hash) => {
   const result = [];
 
-  if (!hash) {
-    return result;
-  }
-
-  let keys = Object.keys(hash);
-  if (keys.length) {
-    for (let key of keys) {
-      result.push({
-        key,
-        value: hash[key],
-      });
+  if (hash) {
+    let keys = Object.keys(hash);
+    if (keys.length > 0) {
+      for (let key of keys) {
+        result.push({
+          key,
+          value: hash[key],
+        });
+      }
     }
   }
 
