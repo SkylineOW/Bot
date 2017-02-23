@@ -8,7 +8,7 @@ const Twitter = require('twitter');
 const config = require('../../config');
 
 /**
- * The main interface object with the twitter api. Primarily for one off implementations.
+ * The main interface object with the twitter api.
  * @type {Twitter}
  */
 const client = new Twitter({
@@ -27,7 +27,7 @@ module.exports = {
    * @param since_id
    * @param callback
    */
-  getLatest: function(user, since_id, callback) {
+  getLatest: function (user, since_id, callback) {
     return client.get('statuses/user_timeline', {
       screen_name: user,
       since_id: since_id,

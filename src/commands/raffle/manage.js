@@ -1,80 +1,73 @@
 /**
- * Command for joining manager list.
+ * Command for joining manager list
  */
 
-const Guild = require('data/mongoose').models.Guild;
-const Raffle = require('data/mongoose').models.Raffle;
+const async = require('async');
+const pe = require('utils/error');
 
-const label = 'manage';
+const config = require('config');
+
+const Raffle = require('utils/raffle');
+const Guild = require('utils/guild');
+
 const options = {
   aliases: [],
   caseInsensitive: false,
   deleteCommand: false,
   argsRequired: false,
-  guildOnly: true,
+  guildOnly: true, // Cannot mention people in dm's with the bot since the bot doesn't accept friend requests.
   dmOnly: false,
-  description: `Join the list to receive raffle results or mention people to add them.`,
-  fullDescription: '',
-  usage: '\`mention mention ...\`',
+  description: `Add mentioned user to the list of raffle managers.`,
+  fullDescription: `\n**What:**\nAdd mentioned users to the list of raffle managers (You can mention yourself as well to add yourself).\nTo only add yourself, don't mention anyone.\n` +
+  `\n**Inputs:**\n **mentions** - None or a list of mentioned people separated by spaces.\nOther inputs will result in the command being rejected.\n` +
+  `\n**Who:**\nAnyone that has the permission to manage channels can use this command.\n` +
+  `\n**Examples:** \`${config.prefix}raffle manage\` \`${config.prefix}raffle manage @John#1234 @Mary#0001\``,
+  usage: '\`mentions\`',
   requirements: {
     userIDs: [],
-    permissions: {},
+    permissions: {
+      'manageChannels': true,
+    },
     roleIDs: [],
     roleNames: [],
   },
   cooldown: 1000,
-  cooldownMessage: 'cooldown',
-  permissionMessage: 'permissions',
+  cooldownMessage: 'Move too quickly, and you overlook much.',
+  permissionMessage: 'Command cannot be used here or you do not have sufficient permissions.'
+};
+
+const checkInput = (value) => {
+  // Only custom mentions format is allowed.
+  return value.match(/^<@\d*>$/) === null;
 };
 
 module.exports = {
-  RegisterCommand: (bot, parent) => {
-    const command = parent.registerSubcommand(label, async(msg, args) => {
-      // Input validation
+  exec: async (msg, args) => {
+    let users = [];
 
-      // ToDo: Implement adding mentioned users and not just the command user.
-
-      const addManager = async() => {
-        // Fetch the guild
-        let guild = await Guild.findById(msg.channel.guild.id);
-
-        if (!guild) {
-          // No guild, create a default one.
-          guild = await Guild.create({_id: msg.channel.guild.id});
+    // Input validation
+    if (args.length > 0) {
+      for (let i = 0; i < args.length; i++) {
+        if (checkInput(args[i])) {
+          return `Only mentions are allowed as inputs for this command. For more info use \`!help raffle manage\``;
         }
+      }
 
-        // If there are no raffle settings for the guild, create defaults based on message.
-        if (!guild.raffle) {
-          const raffle = await Raffle.create({managers: [msg.author.id], guild: guild});
+      await async.each(msg.mentions, (mention) => {
+        users.push(mention);
+      });
+    } else {
+      users.push(msg.author);
+    }
 
-          guild = await Guild.findByIdAndUpdate(msg.channel.guild.id, {raffle: raffle}, {new: true, safe: true});
-        } else {
-
-          guild = await new Promise((resolve) => {
-            guild.populate('raffle', (error, result) => {
-              resolve(result);
-            });
-          });
-
-          // Check if the user is registered
-          if (guild.raffle.managers.indexOf(msg.author.id) !== -1) {
-            return `${msg.author.mention} is already managing the raffle.`;
-          }
-
-          await Raffle.findByIdAndUpdate(guild.raffle._id, {$push: {managers: msg.author.id}}, {new: true, safe: true});
-        }
-
-        if (guild.raffle.managers.length > 0) {
-          return `${msg.author.mention} now also manages the raffle.`;
-        } else {
-          return `${msg.author.mention} now manages the raffle.`;
-        }
-      };
-
-      // Managers can be added regardless of the raffle state.
-      return await addManager();
-    }, options);
-
-    // Register subcommands
-  }
+    try {
+      return await Guild.determine(msg, async (guildId) => {
+        return await Raffle.addManagers(guildId, users);
+      }, options);
+    }
+    catch (error) {
+      console.log(pe.render(error));
+    }
+  },
+  options: options
 };

@@ -1,77 +1,51 @@
 /**
- * Command for adding the raffle outputs to the channel this is typed in.
+ * Command for adding the raffle outputs to the channel this is typed in
  */
+const pe = require('utils/error');
 
-const Guild = require('data/mongoose').models.Guild;
-const Raffle = require('data/mongoose').models.Raffle;
+const config = require('config');
 
-const label = 'add';
+const Raffle = require('utils/raffle');
+
 const options = {
   aliases: [],
   caseInsensitive: false,
   deleteCommand: false,
   argsRequired: false,
-  guildOnly: true,
+  guildOnly: true, // This can only happen in guilds. Users add themselves as managers to receive results.
   dmOnly: false,
   description: `Add the channel to the list the raffle should announce in.`,
-  fullDescription: ``,
+  fullDescription: `\n**What:**\nAdd the channel this command is used in to the list of channels the raffle uses to broadcast results.\n` +
+  `\n**Inputs:**\nNo inputs. Adding inputs will result in the command being rejected.\n` +
+  `\n**Who:**\nAnyone that has the permission to manage channels can use this command.\n` +
+  `\n**Example:** \`${config.prefix}raffle add\``,
   usage: ``,
   requirements: {
     userIDs: [],
-    permissions: {},
+    permissions: {
+      'manageChannels': true,
+    },
     roleIDs: [],
     roleNames: []
   },
   cooldown: 1000,
-  cooldownMessage: 'cooldown',
-  permissionMessage: 'permissions'
+  cooldownMessage: 'Move too quickly, and you overlook much.',
+  permissionMessage: 'Command cannot be used here or you do not have sufficient permissions.'
 };
 
 module.exports = {
-  RegisterCommand: (bot, parent) => {
-    const command = parent.registerSubcommand(label, async(msg, args) => {
-      //Input validation
-      if (args.length > 0) {
-        return `Invalid usage. Do \`!help raffle add\` to view proper usage.`;
-      }
+  exec: async (msg, args) => {
+    // Input validation
+    if (args.length > 0) {
+      return `Invalid usage. Do \`!help raffle add\` to view proper usage.`;
+    }
 
-      const addChannel = async() => {
-        // Fetch the guild
-        let guild = await Guild.findById(msg.channel.guild.id);
-
-        if (!guild) {
-          // No guild, create a default one.
-          guild = await Guild.create({_id: msg.channel.guild.id});
-        }
-
-        // If there are no raffle settings for this guild, create default based on message.
-        if (!guild.raffle) {
-          const raffle = await Raffle.create({channels: [msg.channel.id], guild: guild});
-
-          guild = await Guild.findByIdAndUpdate(msg.channel.guild.id, {raffle: raffle}, {new: true, safe: true});
-        } else {
-
-          guild = await new Promise((resolve) => {
-            guild.populate('raffle', (error, result) => {
-              resolve(result);
-            });
-          });
-
-          //Check if the channel is registered.
-          if (guild.raffle.channels.indexOf(msg.channel.id) !== -1) {
-            return 'The raffle already uses this channel.';
-          }
-
-          await Raffle.findByIdAndUpdate(guild.raffle._id, {$push: {channels: msg.channel.id}}, {new: true, safe: true});
-        }
-
-        return 'The raffle now uses this channel.';
-      };
-
-      // Channels can be added regardless of the raffle state.
-      return await addChannel();
-    }, options);
-
-    // Register subcommands
-  }
+    try {
+      return await Raffle.addChannel(msg.channel);
+    }
+    catch (error) {
+      console.log(pe.render(error));
+    }
+  },
+  options: options
 };

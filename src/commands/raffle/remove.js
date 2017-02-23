@@ -1,11 +1,12 @@
 /**
- * Command for removing the raffle outputs from the channel this is typed in.
+ * Command for removing the raffle outputs from the channel this is typed in
  */
+const pe = require('utils/error');
 
-const Guild = require('data/mongoose').models.Guild;
-const Raffle = require('data/mongoose').models.Raffle;
+const config = require('config');
 
-const label = 'remove';
+const Raffle = require('utils/raffle');
+
 const options = {
   aliases: [],
   caseInsensitive: false,
@@ -14,60 +15,37 @@ const options = {
   guildOnly: true,
   dmOnly: false,
   description: `Remove the channel from the list the raffle should announce in.`,
-  fullDescription: ``,
+  fullDescription: `\n**What:**\nRemove the channel this command is used in from the list of channels the raffle uses to broadcast results.\n` +
+  `\n**Inputs:**\nNo inputs. Adding inputs will result in the command being rejected.\n` +
+  `\n**Who:**\nAnyone that has the permission to manage channels can use this command.\n` +
+  `\n**Example:** \`${config.prefix}raffle remove\``,
   usage: ``,
   requirements: {
     userIDs: [],
-    permissions: {},
+    permissions: {
+      'manageChannels': true,
+    },
     roleIDs: [],
     roleNames: []
   },
   cooldown: 1000,
-  cooldownMessage: 'cooldown',
-  permissionMessage: 'permissions'
+  cooldownMessage: 'Move too quickly, and you overlook much.',
+  permissionMessage: 'Command cannot be used here or you do not have sufficient permissions.'
 };
 
 module.exports = {
-  RegisterCommand: (bot, parent) => {
-    const command = parent.registerSubcommand(label, async(msg, args) => {
-      // Input validation
-      if (args.length > 0) {
-        return `Invalid usage. Do \`!help raffle remove\` to view proper usage.`;
-      }
+  exec: async (msg, args) => {
+    // Input validation
+    if (args.length > 0) {
+      return `Invalid usage. Do \`!help raffle remove\` to view proper usage.`;
+    }
 
-      const removeChannel = async() => {
-        // Fetch the guild
-        let guild = await Guild.findById(msg.channel.guild.id);
-
-        if (!guild || !guild.raffle) {
-          // No guild, exit out.
-          return `The raffle does not use this channel.`;
-        }
-
-        guild = await new Promise((resolve) => {
-          guild.populate('raffle', (error, result) => {
-            resolve(result);
-          });
-        });
-
-        if(guild.raffle.channels.indexOf(msg.channel.id) === -1) {
-          return `The raffle does not use this channel.`;
-        }
-
-        // Raffle needs at least 1 channel to post results in.
-        if (guild.raffle.channels.length <= 1) {
-          return 'The raffle needs at least one channel to post results in.\nPlease add another channel before removing this one.';
-        }
-
-        await Raffle.findByIdAndUpdate(guild.raffle._id, {$pull: {channels: msg.channel.id}}, {new: true, safe: true});
-        return `The raffle no longer uses this channel.`;
-      };
-
-      // Channels can be removed regardless of the raffle state.
-      return await removeChannel();
-
-    }, options);
-
-    // Register subcommands
-  }
+    try {
+      return await Raffle.removeChannel(msg.channel);
+    }
+    catch (error) {
+      console.log(pe.render(error));
+    }
+  },
+  options: options,
 };

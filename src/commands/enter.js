@@ -1,31 +1,30 @@
 /**
- * Command that concludes a raffle and cleans everything up for a new raffle to start
+ * Command for entering into a running raffle
  */
-
 const pe = require('utils/error');
 
 const config = require('config');
 
-const Raffle = require('utils/raffle');
 const Guild = require('utils/guild');
+const Raffle = require('utils/raffle');
 
 const options = {
   aliases: [],
   caseInsensitive: false,
-  deleteCommand: false,
+  deleteCommand: true, // Delete this command to keep channels tidy.
   argsRequired: false,
   guildOnly: false,
-  dmOnly: false,
-  description: `Conclude a raffle, cleaning up entries and results.`,
-  fullDescription: `\n**What:**\nCommand for ending a raffle completely, cleaning up everything.\n` +
+  dmOnly: false, // Command can be used anywhere, but will output confirmation in raffle channels.
+  description: `Enter an ongoing raffle.`,
+  fullDescription: `\n**What:**\nIf you would like enter the raffle, use this command.\n` +
   `\n**Inputs:**\nNo inputs. Adding inputs will result in the command being rejected.\n` +
-  `\n**Who:**\nAnyone that has the permission to manage channels can use this command.\n` +
-  `\n**Example:** \`${config.prefix}raffle finish\``,
+  `\n**Who:**\nThis command is only valid when a raffle is ongoing and accepting entries.\n` +
+  `\n**Example:** \`${config.prefix}enter\``,
   usage: ``,
   requirements: {
     userIDs: [],
     permissions: {
-      'manageChannels': true,
+      'sendMessages': true,
     },
     roleIDs: [],
     roleNames: []
@@ -37,19 +36,19 @@ const options = {
 
 module.exports = {
   exec: async (msg, args) => {
-    // Input validation
+    //Input validation
     if (args.length > 0) {
-      return `Invalid usage. Do \`!help raffle finish\` to view proper usage.`;
+      return `Invalid usage. Do \`!help raffle enter\` to view proper usage.`;
     }
 
     try {
       return await Guild.determine(msg, async (guildId) => {
-        return await Raffle.finish(guildId);
+        return await Raffle.enter(guildId, msg.author);
       }, options);
     }
     catch (error) {
       console.log(pe.render(error));
     }
   },
-  options: options
+  options
 };

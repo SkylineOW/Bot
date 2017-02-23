@@ -1,13 +1,13 @@
 /**
- * Command that concludes a raffle and cleans everything up for a new raffle to start
+ * Command for withdrawing from a raffle manually
  */
 
 const pe = require('utils/error');
 
 const config = require('config');
 
-const Raffle = require('utils/raffle');
 const Guild = require('utils/guild');
+const Raffle = require('utils/raffle');
 
 const options = {
   aliases: [],
@@ -15,18 +15,16 @@ const options = {
   deleteCommand: false,
   argsRequired: false,
   guildOnly: false,
-  dmOnly: false,
-  description: `Conclude a raffle, cleaning up entries and results.`,
-  fullDescription: `\n**What:**\nCommand for ending a raffle completely, cleaning up everything.\n` +
+  dmOnly: true, // Command is intended for private communication with the bot.
+  description: `Withdraw from the raffle.`,
+  fullDescription: `\n**What:**\nCommand to withdraw from a raffle you have been chosen in.\n` +
   `\n**Inputs:**\nNo inputs. Adding inputs will result in the command being rejected.\n` +
-  `\n**Who:**\nAnyone that has the permission to manage channels can use this command.\n` +
-  `\n**Example:** \`${config.prefix}raffle finish\``,
-  usage: ``,
+  `\n**Who:**\nThis command is only available to raffle entrants that have been selected to participate.\n` +
+  `\n**Example:** \`${config.prefix}withdraw\``,
+  usage: '',
   requirements: {
     userIDs: [],
-    permissions: {
-      'manageChannels': true,
-    },
+    permissions: {},
     roleIDs: [],
     roleNames: []
   },
@@ -39,17 +37,17 @@ module.exports = {
   exec: async (msg, args) => {
     // Input validation
     if (args.length > 0) {
-      return `Invalid usage. Do \`!help raffle finish\` to view proper usage.`;
+      return `Invalid usage. Do \`!help withdraw\` to view proper usage.`;
     }
 
     try {
       return await Guild.determine(msg, async (guildId) => {
-        return await Raffle.finish(guildId);
+        return await Raffle.withdraw(guildId, msg.author.id);
       }, options);
     }
     catch (error) {
       console.log(pe.render(error));
     }
   },
-  options: options
+  options,
 };

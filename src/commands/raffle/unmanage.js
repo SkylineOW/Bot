@@ -2,23 +2,32 @@
  * Command for leaving manager list
  */
 
-const Guild = require('data/mongoose').models.Guild;
-const Raffle = require('data/mongoose').models.Raffle;
+const async = require('async');
+const pe = require('utils/error');
 
-const label = 'unmanage';
+const config = require('config');
+
+const Raffle = require('utils/raffle');
+const Guild = require('utils/guild');
+
 const options = {
   aliases: [],
   caseInsensitive: false,
   deleteCommand: false,
   argsRequired: false,
-  guildOnly: true,
+  guildOnly: true, // Cannot mention people in dm's with the bot since the bot doesn't accept friend requests.
   dmOnly: false,
   description: `Leave the list to receive raffle results or mention people to remove them.`,
-  fullDescription: ``,
-  usage: `mention mention ...`,
+  fullDescription: `\n**What:**\nRemove mentioned users from the list of raffle managers (You can mention yourself as well to remove yourself).\nTo only remove yourself, don't mention anyone.\n` +
+  `\n**Inputs:**\n **mentions** - None or a list of mentioned people separated by spaces.\nOther inputs will result in the command being rejected.\n` +
+  `\n**Who:**\nAnyone that has the permission to manage channels can use this command.\n` +
+  `\n**Examples:** \`${config.prefix}raffle unmanage\` \`${config.prefix}raffle unmanage @John#1234 @Mary#0001\``,
+  usage: `\`mentions\``,
   requirements: {
     userIDs: [],
-    permissions: {},
+    permissions: {
+      'manageChannels': true,
+    },
     roleIDs: [],
     roleNames: []
   },
@@ -27,40 +36,38 @@ const options = {
   permissionMessage: 'permissions'
 };
 
+const checkInput = (value) => {
+  // Only custom mentions format is allowed.
+  return value.match(/^<@\d*>$/) === null;
+};
+
 module.exports = {
-  RegisterCommand: (bot, parent) => {
-    const command = parent.registerSubcommand(label, async(msg, args) => {
-      // Input validation
+  exec: async (msg, args) => {
+    let users = [];
 
-      // ToDo: Implement adding mentioned users and not just the command user.
-
-      const removeManager = async() => {
-        // Fetch the guild
-        let guild = await Guild.findById(msg.channel.guild.id);
-
-        if(!guild || !guild.raffle) {
-          //No guild, exit out.
-          return `${msg.author.mention} is not managing the raffle.`;
+    // Input validation
+    if (args.length > 0) {
+      for (let i = 0; i < args.length; i++) {
+        if (checkInput(args[i])) {
+          return `Only mentions are allowed as inputs for this command. For more info use \`!help raffle manage\``;
         }
+      }
 
-        guild = await new Promise((resolve) => {
-          guild.populate('raffle', (error, result) => {
-            resolve(result);
-          });
-        });
+      await async.each(msg.mentions, (mention) => {
+        users.push(mention);
+      });
+    } else {
+      users.push(msg.author);
+    }
 
-        if(guild.raffle.managers.indexOf(msg.author.id) === -1) {
-          return `${msg.author.mention} is not managing the raffle.`;
-        }
-
-        await Raffle.findByIdAndUpdate(guild.raffle._id, {$pull: {managers: msg.author.id}}, {new: true, safe: true});
-        return `The raffle is no longer managed by ${msg.author.mention}`;
-      };
-
-      // Managers can be removed regardless of the raffle state.
-      return await removeManager();
-    },options);
-
-    // Register subcommands
-  }
+    try {
+      return await Guild.determine(msg, async (guildId) => {
+        return await Raffle.removeManagers(guildId, users);
+      }, options);
+    }
+    catch (error) {
+      console.log(pe.render(error));
+    }
+  },
+  options: options,
 };
